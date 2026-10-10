@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% block title %}الحركات{% endblock %}
+{% block content %}
+
+<div class="row">
+  <div style="flex:1"></div>
+  {% if user.can_move %}
+    <a class="btn g" href="{% url 'inventory:movement_create' 'in' %}">
+      <svg class="ico ico-sm"><use href="#i-in"/></svg>
+      استلام
+    </a>
+    <a class="btn r" href="{% url 'inventory:movement_create' 'out' %}">
+      <svg class="ico ico-sm"><use href="#i-out"/></svg>
+      صرف
+    </a>
+  {% endif %}
+</div>
+
+<form method="get" class="filters">
+  <div class="filter-search">
+    <svg class="ico"><use href="#i-search"/></svg>
+    <input name="q" value="{{ q }}" placeholder="ابحث في الصنف، المرجع، الملاحظة...">
+  </div>
+
+  <select name="kind">
+    <option value="">كل الأنواع</option>
+    <option value="in"  {% if kind == 'in' %}selected{% endif %}>استلام</option>
+    <option value="out" {% if kind == 'out' %}selected{% endif %}>صرف</option>
+  </select>
+
+  <select name="item" style="min-width:200px">
+    <option value="">كل الأصناف</option>
+    {% for it in items %}
+      <option value="{{ it.pk }}" {% if item_id == it.pk|stringformat:"s" %}selected{% endif %}>
+        {{ it.name }}
+      </option>
+    {% endfor %}
+  </select>
+
+  <input type="date" name="from" value="{{ date_from }}" placeholder="من تاريخ" data-tip="من تاريخ">
+  <input type="date" name="to"   value="{{ date_to }}"   placeholder="إلى تاريخ" data-tip="إلى تاريخ">
+
+  <button class="btn" type="submit">
+    <svg class="ico ico-sm"><use href="#i-search"/></svg>
+    تصفية
+  </button>
+
+  {% if has_filter %}
+    <a class="btn ghost" href="{% url 'inventory:movement_list' %}">إلغاء</a>
+  {% endif %}
+</form>
+
+<div class="results-info">
+  عدد النتائج: <b>{{ page_obj.paginator.count }}</b>
+  {% if page_obj.paginator.num_pages > 1 %}
+    · صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}
+  {% endif %}
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>النوع</th>
+      <th>الصنف</th>
+      <th>الكمية</th>
+      <th>المرجع</th>
+      <th>ملاحظة</th>
+      <th>بواسطة</th>
+      <th>التاريخ</th>
+      <th>إجراءات</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for m in moves %}
+    <tr>
+      <td>
+        {% if m.kind == 'in' %}
+          <span class="badge b-ok">
+            <svg class="ico ico-sm" style="margin-inline-end:4px"><use href="#i-in"/></svg>
+            استلام
+          </span>
+        {% else %}
+          <span class="badge b-bad">
+            <svg class="ico ico-sm" style="margin-inline-end:4px"><use href="#i-out"/></svg>
+            صرف
+          </span>
+        {% endif %}
+      </td>
+      <td>
+        {{ m.item.name }}
+        {% if m.item.brand %}<span class="chip">{{ m.item.brand.name }}</span>{% endif %}
+      </td>
+      <td>
+        {% if m.kind == 'in' %}
+          <b style="color:#22c55e">+{{ m.qty }}</b>
+        {% else %}
+          <b style="color:#ef4444">−{{ m.qty }}</b>
+        {% endif %}
+        <span style="color:#8a929d;font-size:11px">{{ m.item.unit.name }}</span>
+      </td>
+      <td>{{ m.ref|default:"—" }}</td>
+      <td style="color:#8a929d">{{ m.notes|default:"—" }}</td>
+      <td style="color:#8a929d;font-size:12px">{{ m.created_by.username }}</td>
+      <td style="color:#8a929d;font-size:12px">{{ m.created_at|date:"Y-m-d H:i" }}</td>
+      <td>
+        {% if user.can_move %}
+          <div style="display:flex;gap:6px;white-space:nowrap">
+
+            <a
+              class="btn ghost"
+              href="{% url 'inventory:movement_edit' m.pk %}"
+            >
+              تعديل
+            </a>
+
+            <a
+              class="btn ghost"
+              href="{% url 'inventory:movement_delete' m.pk %}"
+            >
+              حذف
+            </a>
+
+          </div>
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="8" class="empty">
+      {% if has_filter %}لا نتائج مطابقة للفلتر.{% else %}لا توجد حركات بعد.{% endif %}
+    </td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% include '_pagination.html' %}
+
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div style="max-width:720px;margin:0 auto">
+  <div class="row"><div><h2 style="margin:0">{{ title }}</h2></div></div>
+  <div class="card">
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+        <div class="field">
+          <label>{{ field.label }} {% if field.field.required %}<span class="req">*</span>{% endif %}</label>
+          {{ field }}
+          {% if field.errors %}<div style="color:var(--bad);font-size:12px;margin-top:5px">{{ field.errors|striptags }}</div>{% endif %}
+        </div>
+      {% endfor %}
+      <div style="display:flex;gap:8px">
+        <button class="btn" type="submit">حفظ</button>
+        <a class="btn ghost" href="{% url 'payroll:employee_list' %}">إلغاء</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

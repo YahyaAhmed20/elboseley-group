@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div style="max-width:760px;margin:0 auto">
+  <div class="row"><div><h2 style="margin:0">{{ title }}</h2></div></div>
+  <div class="card">
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+        {% if field.name == 'follow_up_enabled' %}
+          <div class="field" style="display:flex;align-items:center;gap:10px">
+            {{ field }}
+            <label style="margin:0;color:var(--txt);font-weight:600">{{ field.label }}</label>
+          </div>
+          <div class="row-sub" style="margin-bottom:16px">عند تفعيلها سيُحدد موعد مراجعة تلقائيًا بعد 6 شهور من تاريخ تسجيل العميل.</div>
+        {% else %}
+          <div class="field">
+            <label>{{ field.label }} {% if field.field.required %}<span class="req">*</span>{% endif %}</label>
+            {{ field }}
+            {% if field.errors %}<div style="color:var(--bad);font-size:12px;margin-top:5px">{{ field.errors|striptags }}</div>{% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+      <div style="display:flex;gap:8px">
+        <button class="btn" type="submit">حفظ</button>
+        <a class="btn ghost" href="{% url 'customers:customer_list' %}">إلغاء</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% block title %}المخزون{% endblock %}
+{% block content %}
+
+<form method="get" class="filters">
+  <div class="filter-search">
+    <svg class="ico"><use href="#i-search"/></svg>
+    <input name="q" value="{{ q }}" placeholder="ابحث بالكود أو الاسم أو البراند أو النوع...">
+  </div>
+
+  <select name="type">
+    <option value="">كل الأنواع</option>
+    {% for t in types %}
+      <option value="{{ t.pk }}" {% if type_id == t.pk|stringformat:"s" %}selected{% endif %}>{{ t.name }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="brand">
+    <option value="">كل البراندات</option>
+    {% for b in brands %}
+      <option value="{{ b.pk }}" {% if brand_id == b.pk|stringformat:"s" %}selected{% endif %}>{{ b.name }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="status">
+    <option value="">كل الحالات</option>
+    <option value="ok"   {% if status == 'ok' %}selected{% endif %}>كافٍ</option>
+    <option value="warn" {% if status == 'warn' %}selected{% endif %}>منخفض</option>
+    <option value="bad"  {% if status == 'bad' %}selected{% endif %}>نقص</option>
+  </select>
+
+  <select name="sort">
+    <option value="name"   {% if sort == 'name' %}selected{% endif %}>الاسم (أ-ي)</option>
+    <option value="-name"  {% if sort == '-name' %}selected{% endif %}>الاسم (ي-أ)</option>
+    <option value="-qty"   {% if sort == '-qty' %}selected{% endif %}>الكمية ↓</option>
+    <option value="qty"    {% if sort == 'qty' %}selected{% endif %}>الكمية ↑</option>
+    <option value="-value" {% if sort == '-value' %}selected{% endif %}>القيمة ↓</option>
+    <option value="value"  {% if sort == 'value' %}selected{% endif %}>القيمة ↑</option>
+  </select>
+
+  <button class="btn" type="submit">تصفية</button>
+
+  {% if has_filter %}
+    <a class="btn ghost" href="{% url 'catalog:item_list' %}">إلغاء الفلتر</a>
+  {% endif %}
+
+  <div style="flex:1"></div>
+
+  {% if user.can_add_item %}
+    <a class="btn" href="{% url 'catalog:item_create' %}">
+      <svg class="ico"><use href="#i-plus"/></svg>
+      إضافة صنف
+    </a>
+  {% endif %}
+</form>
+
+<div class="results-info">
+  عدد النتائج: <b>{{ page_obj.paginator.count }}</b>
+  {% if page_obj.paginator.num_pages > 1 %}
+    · صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}
+  {% endif %}
+</div>
+
+<table>
+  <thead><tr>
+    <th>الكود</th><th>الصنف</th><th>النوع</th><th>البراند</th>
+    <th>الكمية</th><th>الوحدة</th><th>التكلفة</th><th>القيمة</th>
+    <th>سعر البيع</th><th>الحالة</th>{% if user.can_add_item %}<th></th>{% endif %}
+  </tr></thead>
+  <tbody>
+  {% for i in items %}
+    <tr>
+      <td><b>#{{ i.code|default:"-" }}</b></td>
+      <td>
+        <b>{{ i.name }}</b>
+        {% if i.spec %}<div class="row-sub">{{ i.spec }}</div>{% endif %}
+      </td>
+      <td>{{ i.type.name }}</td>
+      <td>
+        {% if i.brand %}<span class="badge b-warn">{{ i.brand.name }}</span>
+        {% else %}<span class="row-sub">—</span>{% endif %}
+      </td>
+      <td>{{ i.balance }}</td>
+      <td>{{ i.unit.name }}</td>
+      <td>{{ i.cost }}</td>
+      <td>{{ i.value|floatformat:2 }}</td>
+      <td>{{ i.sale_price }}</td>
+      <td>
+        {% if i.balance > i.min_qty|add:"0" and i.balance > i.min_qty %}
+          {% widthratio i.balance 1 1 as _ %}
+        {% endif %}
+        {% if i.min_qty and i.balance <= i.min_qty %}
+          <span class="badge b-bad">نقص</span>
+        {% elif i.min_qty and i.balance <= i.min_qty|add:i.min_qty %}
+          <span class="badge b-warn">منخفض</span>
+        {% else %}
+          <span class="badge b-ok">كافٍ</span>
+        {% endif %}
+      </td>
+      {% if user.can_add_item %}
+        <td class="actions">
+          <a class="icon-btn" href="{% url 'catalog:item_edit' i.pk %}" data-tip="تعديل">
+            <svg class="ico"><use href="#i-edit"/></svg>
+          </a>
+          <form method="post" action="{% url 'catalog:item_delete' i.pk %}"
+                onsubmit="return confirm('حذف الصنف: {{ i.name }}؟')">
+            {% csrf_token %}
+            <button class="icon-btn danger" type="submit" data-tip="حذف">
+              <svg class="ico"><use href="#i-trash"/></svg>
+            </button>
+          </form>
+        </td>
+      {% endif %}
+    </tr>
+  {% empty %}
+    <tr><td colspan="11" class="empty">
+      {% if has_filter %}لا نتائج مطابقة للفلتر.{% else %}لا توجد أصناف بعد.{% endif %}
+    </td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="pagination">
+  {% if page_obj.has_previous %}
+    <a class="page-btn" href="?{% querystring page=page_obj.previous_page_number %}">
+      <svg class="ico"><use href="#i-chevron-right"/></svg>
+    </a>
+  {% endif %}
+
+  {% for num in page_obj.paginator.page_range %}
+    {% if num == page_obj.number %}
+      <span class="page-btn active">{{ num }}</span>
+    {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+      <a class="page-btn" href="?{% querystring page=num %}">{{ num }}</a>
+    {% endif %}
+  {% endfor %}
+
+  {% if page_obj.has_next %}
+    <a class="page-btn" href="?{% querystring page=page_obj.next_page_number %}">
+      <svg class="ico"><use href="#i-chevron-left"/></svg>
+    </a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% endblock %}

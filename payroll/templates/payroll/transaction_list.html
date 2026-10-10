@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}السلف والخصومات{% endblock %}
+{% block content %}
+<div class="row" style="justify-content:space-between">
+  <div>
+    <h2 style="margin:0 0 4px">السلف والخصومات</h2>
+    <div class="row-sub">كل عملية مرتبطة بعامل وبشهر محدد، فلا تختلط الشهور.</div>
+  </div>
+  <a class="btn" href="{% url 'payroll:transaction_create' %}?month={{ payroll_month }}">+ تسجيل عملية</a>
+</div>
+
+<div class="filters">
+  <form method="get" style="display:flex;gap:10px;align-items:center;flex:1;flex-wrap:wrap">
+    <select name="month" onchange="this.form.submit()" style="min-width:180px">
+      {% for m in months %}<option value="{{ m }}" {% if m.id == payroll_month.id %}selected{% endif %}>{{ m.label }}</option>{% endfor %}
+    </select>
+    <select name="employee"><option value="">كل العمال</option>{% for e in employees %}<option value="{{ e.id }}" {% if employee_id|stringformat:'s' == e.id|stringformat:'s' %}selected{% endif %}>{{ e.name }}</option>{% endfor %}</select>
+    <select name="kind">
+      <option value="">كل الأنواع</option>
+      {% for value,label in kind_choices %}<option value="{{ value }}" {% if kind == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <input name="q" value="{{ q }}" placeholder="بحث..." style="min-width:180px">
+    <button class="btn ghost" type="submit">تطبيق</button>
+  </form>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-ico blue"><svg class="ico"><use href="#i-money"/></svg></div><div class="stat-info"><div class="stat-lbl">إجمالي السلف</div><div class="stat-val">{{ total_advance|floatformat:2 }} <small>ج</small></div></div></div>
+  <div class="stat"><div class="stat-ico red"><svg class="ico"><use href="#i-alert"/></svg></div><div class="stat-info"><div class="stat-lbl">إجمالي الهدر</div><div class="stat-val">{{ total_waste|floatformat:2 }} <small>ج</small></div></div></div>
+  <div class="stat"><div class="stat-ico gold"><svg class="ico"><use href="#i-money"/></svg></div><div class="stat-info"><div class="stat-lbl">خصومات أخرى</div><div class="stat-val">{{ total_other|floatformat:2 }} <small>ج</small></div></div></div>
+</div>
+
+<div class="card">
+  <table>
+    <thead><tr><th>التاريخ</th><th>العامل</th><th>النوع</th><th>المبلغ</th><th>الملاحظة</th><th>بواسطة</th><th></th></tr></thead>
+    <tbody>
+    {% for t in transactions %}
+      <tr>
+        <td>{{ t.transaction_date|date:'d/m/Y' }}</td>
+        <td><b>{{ t.employee_payroll.employee.name }}</b></td>
+        <td><span class="badge {% if t.kind == 'waste' %}b-bad{% else %}b-warn{% endif %}">{{ t.get_kind_display }}</span></td>
+        <td><b>{{ t.amount|floatformat:2 }} ج</b></td>
+        <td>{{ t.note|default:'—' }}</td>
+        <td>{{ t.created_by.first_name|default:t.created_by.username }}</td>
+        <td>
+          <form method="post" action="{% url 'payroll:transaction_delete' t.id %}" onsubmit="return confirm('حذف العملية؟');">
+            {% csrf_token %}<button class="icon-btn danger" title="حذف">✕</button>
+          </form>
+        </td>
+      </tr>
+    {% empty %}<tr><td colspan="7" style="text-align:center;color:var(--dim);padding:30px">لا توجد عمليات في {{ payroll_month.label }}.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

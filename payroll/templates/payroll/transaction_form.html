@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}تسجيل سلفة / خصم{% endblock %}
+{% block content %}
+<div style="max-width:720px;margin:0 auto">
+  <div class="row"><div><h2 style="margin:0">تسجيل سلفة / خصم</h2><div class="row-sub">سيتم تسجيل العملية على {{ payroll_month.label }} فقط.</div></div></div>
+  <div class="card">
+    {% if form.non_field_errors %}<div class="card" style="margin-bottom:14px;color:var(--bad)">{{ form.non_field_errors }}</div>{% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <div class="field"><label>الشهر</label><input value="{{ payroll_month.label }}" disabled></div>
+      <div class="field"><label>العامل <span class="req">*</span></label>
+        <select name="employee" required>
+          <option value="">— اختر العامل —</option>
+          {% for e in employees %}<option value="{{ e.id }}" {% if employee and employee.id == e.id %}selected{% endif %}>{{ e.name }} — {{ e.salary|floatformat:2 }} ج</option>{% endfor %}
+        </select>
+      </div>
+      {% for field in form %}
+        <div class="field"><label>{{ field.label }} {% if field.field.required %}<span class="req">*</span>{% endif %}</label>{{ field }}{% if field.errors %}<div style="color:var(--bad);font-size:12px">{{ field.errors|striptags }}</div>{% endif %}</div>
+      {% endfor %}
+      <div style="display:flex;gap:8px"><button class="btn" type="submit">حفظ العملية</button><a class="btn ghost" href="{% url 'payroll:transaction_list' %}?month={{ payroll_month }}">إلغاء</a></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

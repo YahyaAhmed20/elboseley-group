@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}العمال{% endblock %}
+{% block content %}
+<div class="row" style="justify-content:space-between">
+  <div>
+    <h2 style="margin:0 0 4px">العمال</h2>
+    <div class="row-sub">مرتبات الشهر محفوظة كنسخة مستقلة، لذلك تعديل راتب العامل لا يغيّر الشهور السابقة.</div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btn ghost" href="{% url 'payroll:transaction_list' %}?month={{ payroll_month }}">السلف والخصومات</a>
+    <a class="btn" href="{% url 'payroll:employee_create' %}">+ إضافة عامل</a>
+  </div>
+</div>
+
+<div class="filters">
+  <form method="get" style="display:flex;gap:10px;align-items:center;flex:1;flex-wrap:wrap">
+    <select name="month" onchange="this.form.submit()" style="min-width:180px">
+      {% for m in months %}
+        <option value="{{ m }}" {% if m.id == payroll_month.id %}selected{% endif %}>{{ m.label }}</option>
+      {% endfor %}
+    </select>
+    <div class="filter-search">
+      <svg class="ico"><use href="#i-search"/></svg>
+      <input name="q" value="{{ q }}" placeholder="بحث باسم العامل...">
+    </div>
+    <button class="btn ghost" type="submit">بحث</button>
+  </form>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div>
+      <b>{{ payroll_month.label }}</b>
+      <span class="chip">كشف المرتبات</span>
+    </div>
+    <a class="btn sm" href="{% url 'payroll:transaction_create' %}?month={{ payroll_month }}">+ تسجيل سلفة / خصم</a>
+  </div>
+  <div style="overflow:auto">
+    <table>
+      <thead><tr><th>العامل</th><th>الحالة</th><th>مرتب الشهر</th><th>السلف</th><th>الهدر</th><th>خصومات أخرى</th><th>الصافي</th><th>إجراء</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        {% with p=row.payroll %}
+        <tr>
+          <td><b>{{ row.employee.name }}</b></td>
+          <td><span class="badge {% if row.employee.status == 'active' %}b-ok{% else %}b-warn{% endif %}">{{ row.employee.get_status_display }}</span></td>
+          <td>{{ p.salary|default:row.employee.salary|floatformat:2 }} ج</td>
+          <td>{{ p.advance_total|default_if_none:0|floatformat:2 }} ج</td>
+          <td>{{ p.waste_total|default_if_none:0|floatformat:2 }} ج</td>
+          <td>{{ p.other_total|default_if_none:0|floatformat:2 }} ج</td>
+          <td><b>{{ row.net_salary|floatformat:2 }} ج</b></td>
+          <td class="actions">
+            <a class="icon-btn" href="{% url 'payroll:employee_edit' row.employee.id %}" title="تعديل">✎</a>
+            <a class="btn sm" href="{% url 'payroll:transaction_list' %}?month={{ payroll_month }}&employee={{ row.employee.id }}">كشف</a>
+          </td>
+        </tr>
+        {% endwith %}
+      {% empty %}
+        <tr><td colspan="8" style="text-align:center;color:var(--dim);padding:30px">لا يوجد عمال.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="row-sub">يمكنك الرجوع لأي شهر سابق من قائمة الشهر بالأعلى. كل شهر يحتفظ براتب ذلك الوقت وعملياته بشكل مستقل.</div>
+{% endblock %}

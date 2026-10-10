@@ -1,0 +1,39 @@
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="pagination">
+  {% if page_obj.has_previous %}
+    <a class="page-btn" href="?{% querystring page=page_obj.previous_page_number %}">
+      <svg class="ico"><use href="#i-chevron-right"/></svg>
+    </a>
+  {% else %}
+    <span class="page-btn disabled">
+      <svg class="ico"><use href="#i-chevron-right"/></svg>
+    </span>
+  {% endif %}
+
+  {% for num in page_obj.paginator.page_range %}
+    {% if num == page_obj.number %}
+      <span class="page-btn active">{{ num }}</span>
+    {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+      <a class="page-btn" href="?{% querystring page=num %}">{{ num }}</a>
+    {% elif num == 1 or num == page_obj.paginator.num_pages %}
+      <a class="page-btn" href="?{% querystring page=num %}">{{ num }}</a>
+    {% elif num == page_obj.number|add:"-3" or num == page_obj.number|add:"3" %}
+      <span class="page-btn disabled">…</span>
+    {% endif %}
+  {% endfor %}
+
+  {% if page_obj.has_next %}
+    <a class="page-btn" href="?{% querystring page=page_obj.next_page_number %}">
+      <svg class="ico"><use href="#i-chevron-left"/></svg>
+    </a>
+  {% else %}
+    <span class="page-btn disabled">
+      <svg class="ico"><use href="#i-chevron-left"/></svg>
+    </span>
+  {% endif %}
+</nav>
+
+<div class="pagination-info">
+  {{ page_obj.paginator.count }} نتيجة · صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}
+</div>
+{% endif %}

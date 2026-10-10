@@ -1,0 +1,295 @@
+{% load static %}
+<!doctype html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="utf-8">
+    <title>إيصال استلام جهاز #{{ order.device.code }}</title>
+
+    <script src="{% static 'qz/qz-tray.js' %}"></script>
+    <script src="{% static 'qz/qz-print.js' %}"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            width: 80mm;
+            margin: auto;
+            padding: 8mm;
+            font-size: 13px;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .line {
+            border-top: 1px dashed #000;
+            margin: 8px 0;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            gap: 10px;
+        }
+
+        .actions {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        @media print {
+            .actions {
+                display: none;
+            }
+
+            @page {
+                size: 80mm auto;
+                margin: 0;
+            }
+
+            body {
+                width: 72mm;
+                padding: 4mm;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="center">
+        <h3>إيصال استلام جهاز #{{ order.device.code }}</h3>
+        <div>البوصيلي جروب</div>
+    </div>
+
+    <div class="line"></div>
+
+    <div class="row">
+        <b>العميل</b>
+        <span>{{ order.device.customer.name }}</span>
+    </div>
+
+    <div class="row">
+        <b>الهاتف</b>
+        <span>{{ order.device.customer.phone }}</span>
+    </div>
+
+    <div class="row">
+        <b>كود الجهاز</b>
+        <span>#{{ order.device.code }}</span>
+    </div>
+
+    <div class="row">
+        <b>الجهاز</b>
+        <span>{{ order.device.device_type }}</span>
+    </div>
+
+    <div class="row">
+        <b>العطل</b>
+        <span>{{ order.fault_description }}</span>
+    </div>
+
+    <div class="row">
+        <b>العربون</b>
+        <span>{{ order.deposit }} ج.م</span>
+    </div>
+
+    <div class="row">
+        <b>التاريخ</b>
+        <span>{{ order.received_at|date:'d/m/Y H:i' }}</span>
+    </div>
+
+    <div class="line"></div>
+
+    <div class="actions">
+        <button onclick="printReceipt()">🖨️ طباعة الإيصال</button>
+    </div>
+
+   <script>
+const printerName = "Argox OS-2130D PPLA";
+
+async function printReceipt() {
+    try {
+        if (!qz.websocket.isActive()) {
+            await qz.websocket.connect();
+        }
+
+        // =====================================================
+        // 60 × 40 mm @ 203 DPI
+        // =====================================================
+
+        const width = 480;
+        const height = 320;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+
+        // Background
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.fillStyle = "#000000";
+        ctx.direction = "rtl";
+        ctx.textBaseline = "top";
+
+        function fillBoldText(text, x, y, maxWidth) {
+            ctx.fillText(text, x, y, maxWidth);
+            ctx.fillText(text, x + 0.7, y, maxWidth);
+        }
+
+        // العنوان
+        ctx.textAlign = "center";
+        ctx.font = "bold 29px Arial";
+        ctx.fillText("إيصال استلام جهاز #{{ order.device.code }}", width / 2, 4, width - 10);
+
+        // اسم المحل
+        ctx.font = "bold 22px Arial";
+        ctx.fillText("البوصيلي جروب", width / 2, 34);
+
+        // الخط الفاصل
+        ctx.beginPath();
+        ctx.moveTo(12, 60);
+        ctx.lineTo(width - 12, 60);
+        ctx.stroke();
+
+        // بيانات العميل والجهاز
+        ctx.font = "bold 29px Arial";
+        ctx.textAlign = "right";
+
+        const rightX = width - 14;
+
+        ctx.fillText(
+            "{{ order.device.customer.name|escapejs }}",
+            rightX, 68, width - 28
+        );
+
+        ctx.fillText(
+            "{{ order.device.customer.phone|escapejs }}",
+            rightX, 101, width - 28
+        );
+
+        ctx.fillText(
+            "#{{ order.device.code }} - {{ order.device.device_type|escapejs }}",
+            rightX, 134, width - 28
+        );
+
+        // العطل أسفل بيانات الجهاز
+        ctx.textAlign = "right";
+        ctx.font = "bold 24px Arial";
+
+        const fault = "{{ order.fault_description|escapejs }}";
+        const faultWords = fault.split(/\s+/);
+        const faultMaxWidth = width - 30;
+        const faultLines = [];
+        let faultLine = "";
+
+        for (const word of faultWords) {
+            const candidate = faultLine
+                ? faultLine + " " + word
+                : word;
+
+            if (ctx.measureText(candidate).width <= faultMaxWidth) {
+                faultLine = candidate;
+            } else {
+                if (faultLine) faultLines.push(faultLine);
+                faultLine = word;
+            }
+        }
+
+        if (faultLine) faultLines.push(faultLine);
+
+        // سطران للعطل كحد أقصى
+        faultLines.slice(0, 2).forEach(function(line, index) {
+            fillBoldText(line, rightX, 174 + index * 27, faultMaxWidth);
+        });
+
+        // التاريخ والعربون في الأسفل
+        ctx.font = "bold 22px Arial";
+        ctx.textAlign = "right";
+
+        fillBoldText(
+            "{{ order.received_at|date:'d/m/Y H:i' }}",
+            rightX, 235, width - 30
+        );
+
+        fillBoldText(
+            "{{ order.deposit }} ج.م",
+            rightX, 266, width - 30
+        );
+
+        // الخط السفلي
+        ctx.beginPath();
+        ctx.moveTo(12, 278);
+        ctx.lineTo(width - 12, 278);
+        ctx.stroke();
+
+        // =====================================================
+        // Base64
+        // =====================================================
+
+        const base64 = canvas
+            .toDataURL("image/png")
+            .split(",")[1];
+
+        // =====================================================
+        // QZ CONFIG
+        // =====================================================
+
+        const config = qz.configs.create(
+            printerName,
+            {
+                units: "in",
+
+                margins: {
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                    left: 0
+                },
+
+                scaleContent: false,
+
+                interpolation: "nearest-neighbor",
+
+                orientation: "portrait"
+            }
+        );
+
+        const data = [{
+            type: "pixel",
+            format: "image",
+            flavor: "base64",
+            data: base64
+        }];
+
+        await qz.print(config, data);
+
+        alert("تم طباعة الإيصال بنجاح.");
+
+        window.location.href =
+            "{% url 'servicecenter:repair_receive' %}";
+
+    } catch (error) {
+        console.error(error);
+
+        alert(
+            "حدث خطأ أثناء الطباعة:\n" + error
+        );
+    }
+}
+</script>
+
+</body>
+
+</html>

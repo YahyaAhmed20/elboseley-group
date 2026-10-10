@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% block title %}لوحة التحكم{% endblock %}
+{% block content %}
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-ico blue">📦</div>
+    <div class="stat-info">
+      <div class="stat-lbl">إجمالي الأصناف</div>
+      <div class="stat-val">{{ total_items }}</div>
+    </div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-ico red">!</div>
+    <div class="stat-info">
+      <div class="stat-lbl">تنبيهات النقص</div>
+      <div class="stat-val">{{ total_alerts }}</div>
+    </div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-ico green">💰</div>
+    <div class="stat-info">
+      <div class="stat-lbl">قيمة المخزون</div>
+      <div class="stat-val">{{ total_value|floatformat:0 }}<small>ج.م</small></div>
+    </div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-ico gold">🔄</div>
+    <div class="stat-info">
+      <div class="stat-lbl">إجمالي الحركات</div>
+      <div class="stat-val">{{ total_moves }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card alerts-panel">
+  <div class="alerts-header">
+    <div class="alerts-title">
+      <span class="alerts-icon"><svg class="ico"><use href="#i-alert"/></svg></span>
+      <h3>تنبيهات المخزون</h3>
+    </div>
+
+    <form method="get" class="alerts-search">
+      <svg class="ico"><use href="#i-search"/></svg>
+      <input name="q" value="{{ q }}" placeholder="ابحث في التنبيهات...">
+      {% if has_filter %}
+        <a class="clear-search" href="{% url 'dashboard:index' %}" data-tip="إلغاء">✕</a>
+      {% endif %}
+    </form>
+
+    {% if alerts.paginator.count %}
+      <span class="alerts-count">{{ alerts.paginator.count }} من {{ total_alerts }}</span>
+    {% endif %}
+  </div>
+
+  {% if alerts %}
+    <div class="alerts-list">
+      {% for i in alerts %}
+        <div class="alert-item {% if i.critical %}critical{% else %}warning{% endif %}">
+          <div class="alert-icon">
+            {% if i.critical %}
+              <svg class="ico"><use href="#i-alert-oct"/></svg>
+            {% else %}
+              <svg class="ico"><use href="#i-alert"/></svg>
+            {% endif %}
+          </div>
+
+          <div class="alert-main">
+            <div class="alert-name">
+              {{ i.name }}
+              {% if i.brand %}<span class="chip">{{ i.brand.name }}</span>{% endif %}
+            </div>
+            <div class="alert-meta">{{ i.type.name }} · {{ i.unit.name }}</div>
+
+            <div class="alert-bar-wrap">
+              <div class="alert-bar {% if i.critical %}critical{% else %}warning{% endif %}">
+                <i style="width:{{ i.fill_pct }}%"></i>
+              </div>
+              <span class="alert-pct {% if i.critical %}critical{% else %}warning{% endif %}">
+                {{ i.fill_pct }}%
+              </span>
+            </div>
+          </div>
+
+          <div class="alert-numbers">
+            <div class="alert-current {% if i.critical %}critical{% else %}warning{% endif %}">
+              {% if i.critical and i.balance <= 0 %}0{% else %}{{ i.balance }}{% endif %}
+            </div>
+            <div class="alert-target">من {{ i.min_qty }}</div>
+          </div>
+
+          <a class="alert-action"
+             href="{% url 'inventory:movement_create' 'in' %}?item={{ i.pk }}"
+             data-tip="استلام بضاعة">
+            <svg class="ico ico-sm"><use href="#i-in"/></svg>
+            استلام
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% include '_pagination.html' %}
+  {% else %}
+    <div class="alerts-empty">
+      <div class="big"><svg><use href="#i-check"/></svg></div>
+      {% if has_filter %}
+        <div>لا نتائج مطابقة لـ "{{ q }}"</div>
+      {% else %}
+        <div>المخزون بحالة جيدة</div>
+        <div style="font-size:12px;margin-top:6px;opacity:.7">
+          لا أصناف تحت الحد الأدنى
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}

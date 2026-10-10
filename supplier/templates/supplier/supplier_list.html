@@ -1,0 +1,4 @@
+{% extends 'base.html' %}{% block title %}الموردين{% endblock %}{% block content %}
+<div class="row"><div><h2>تعريف الموردين</h2><div class="row-sub">اسم المورد، الهاتف، ورصيد أول المدة</div></div><a class="btn" href="{% url 'supplier:supplier_create' %}">+ إضافة مورد</a></div>
+<form class="filters"><div class="filter-search"><input name="q" value="{{ q }}" placeholder="ابحث باسم المورد أو الهاتف"></div><button class="btn ghost">بحث</button></form>
+<table><thead><tr><th>المورد</th><th>الهاتف</th><th>رصيد أول المدة</th><th>إجراء</th></tr></thead><tbody>{% for s in suppliers %}<tr><td>{{s.name}}</td><td>{{s.phone|default:'-'}}</td><td>{{s.opening_balance}}</td><td><a class="btn ghost sm" href="{% url 'supplier:supplier_edit' s.id %}">تعديل</a></td></tr>{% empty %}<tr><td colspan="4">لا يوجد موردون.</td></tr>{% endfor %}</tbody></table>{% include '_pagination.html' %}{% endblock %}

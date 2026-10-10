@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+
+<div class="card" style="max-width:700px;margin:0 auto">
+  <h3 style="margin-top:0">{{ title }}</h3>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="field">
+        <label>{{ field.label }}{% if field.field.required %} <span class="req">*</span>{% endif %}</label>
+        {{ field }}
+        {% if field.errors %}
+          <div style="color:#ef4444;font-size:12px;margin-top:4px">{{ field.errors.0 }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    {% if form.non_field_errors %}
+      <div style="color:#ef4444">{{ form.non_field_errors.0 }}</div>
+    {% endif %}
+
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn" type="submit">حفظ</button>
+      <a class="btn ghost" href="{% url 'catalog:item_list' %}">إلغاء</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+
+{% block title %}سجل الجهاز #{{ device.code }}{% endblock %}
+
+{% block content %}
+
+<div class="row">
+    <div>
+        <h2>سجل الجهاز #{{ device.code }}</h2>
+        <div class="row-sub">
+            تاريخ جميع عمليات الصيانة الخاصة بالجهاز
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>بيانات الجهاز</h3>
+
+
+<table>
+    <tbody>
+        <tr>
+            <th>كود الجهاز</th>
+            <td>#{{ device.code }}</td>
+        </tr>
+        <tr>
+            <th>العميل</th>
+            <td>{{ device.customer.name }}</td>
+        </tr>
+        <tr>
+            <th>الهاتف</th>
+            <td>{{ device.customer.phone }}</td>
+        </tr>
+        <tr>
+            <th>نوع الجهاز</th>
+            <td>{{ device.device_type }}</td>
+        </tr>
+        <tr>
+            <th>وصف الجهاز</th>
+            <td>{{ device.description|default:'-' }}</td>
+        </tr>
+        <tr>
+            <th>عدد مرات الصيانة</th>
+            <td>{{ repairs|length }}</td>
+        </tr>
+    </tbody>
+</table>
+
+
+</div>
+
+<div class="card">
+    <h3>سجل الصيانة</h3>
+
+
+<table>
+    <thead>
+        <tr>
+            <th>أمر الصيانة</th>
+            <th>التاريخ</th>
+            <th>العطل</th>
+            <th>الموظف</th>
+            <th>الحالة</th>
+            <th>التكلفة</th>
+            <th>المصنعية</th>
+            <th>الإجمالي</th>
+            <th>المدفوع</th>
+            <th>المتبقي</th>
+            <th>إجراء</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        {% for repair in repairs %}
+        <tr>
+            <td>#{{ repair.pk }}</td>
+
+            <td>
+                {{ repair.received_at|date:'d/m/Y H:i' }}
+            </td>
+
+            <td>
+                {{ repair.fault_description }}
+            </td>
+
+            <td>
+                {{ repair.employee.name|default:'-' }}
+            </td>
+
+            <td>
+                {{ repair.get_status_display }}
+            </td>
+
+            <td>
+                {{ repair.cost }}
+            </td>
+
+            <td>
+                {{ repair.labor }}
+            </td>
+
+            <td>
+                <strong>{{ repair.total }}</strong>
+            </td>
+
+            <td>
+                {{ repair.total_paid }}
+            </td>
+
+            <td>
+                {{ repair.remaining }}
+            </td>
+
+            <td>
+                <a
+                    class="btn ghost"
+                    href="{% url 'servicecenter:repair_receipt' pk=repair.pk %}"
+                >
+                    إيصال
+                </a>
+
+                <a
+                    class="btn ghost"
+                    href="{% url 'servicecenter:repair_work' pk=repair.pk %}"
+                >
+                    التفاصيل
+                </a>
+            </td>
+        </tr>
+
+        {% empty %}
+        <tr>
+            <td colspan="11">
+                لا توجد عمليات صيانة لهذا الجهاز.
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+</div>
+
+<div style="margin-top: 16px;">
+    <a
+        class="btn ghost"
+        href="{% url 'servicecenter:device_list' %}"
+    >
+        العودة إلى الأجهزة
+    </a>
+
+
+<a
+    class="btn"
+    href="{% url 'servicecenter:repair_list' %}?q={{ device.code }}"
+>
+    عرض أوامر الصيانة
+</a>
+
+
+</div>
+
+{% endblock %}

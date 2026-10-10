@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}المستخدمون{% endblock %}
+{% block content %}
+
+<div class="row">
+  <div style="flex:1"></div>
+  <a class="btn" href="{% url 'accounts:user_create' %}">+ إضافة مستخدم</a>
+</div>
+
+<table>
+  <thead><tr>
+    <th>الاسم</th><th>اسم المستخدم</th><th>الصلاحية</th>
+    <th>آخر دخول</th><th></th>
+  </tr></thead>
+  <tbody>
+  {% for u in users %}
+    <tr>
+      <td>{{ u.first_name|default:"—" }}</td>
+      <td>
+        <b>{{ u.username }}</b>
+        {% if u == request.user %}<span class="chip">أنت</span>{% endif %}
+        {% if u.is_superuser %}<span class="chip">superuser</span>{% endif %}
+      </td>
+      <td>
+        {% if u.role == 'admin' %}<span class="badge b-ok">مدير</span>
+        {% elif u.role == 'keeper' %}<span class="badge b-warn">أمين مخزن</span>
+        {% else %}<span class="badge">مشاهدة</span>{% endif %}
+      </td>
+      <td style="color:#8a929d;font-size:12px">
+        {{ u.last_login|date:"Y-m-d H:i"|default:"—" }}
+      </td>
+      <td>
+        {% if u != request.user and not u.is_superuser %}
+          <form method="post" action="{% url 'accounts:user_delete' u.pk %}"
+                style="display:inline"
+                onsubmit="return confirm('حذف {{ u.username }}؟')">
+            {% csrf_token %}
+            <button class="btn ghost sm" type="submit">🗑</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5" style="text-align:center;padding:40px;color:#8a929d">
+      لا مستخدمين.
+    </td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

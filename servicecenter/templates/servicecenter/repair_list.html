@@ -19,6 +19,11 @@
         📱 الأجهزة وسجل الصيانة
     </a>
 
+    <a class="btn ghost"
+       href="{% url 'customers:customer_create' %}?next=repair_receive">
+        + عميل جديد
+    </a>
+
     <a class="btn" href="{% url 'servicecenter:repair_receive' %}">
         + إيصال استلام جديد
     </a>

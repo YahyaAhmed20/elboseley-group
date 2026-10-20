@@ -6,6 +6,8 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from decimal import Decimal
 
+from common.code_generator import next_code
+
 
 def add_months(value, months):
     month_index = value.month - 1 + months
@@ -16,6 +18,13 @@ def add_months(value, months):
 
 
 class Customer(models.Model):
+    code = models.PositiveIntegerField(
+        'كود العميل',
+        unique=True,
+        null=True,
+        blank=True,
+        editable=False,
+    )
     name = models.CharField('اسم العميل', max_length=150)
     phone = models.CharField('رقم الهاتف', max_length=50, blank=True, default='')
     personal_number = models.CharField('الرقم الشخصي', max_length=100, blank=True, default='')
@@ -47,6 +56,12 @@ class Customer(models.Model):
             models.Index(fields=['car_number']),
             models.Index(fields=['follow_up_enabled', 'follow_up_date']),
         ]
+
+    def save(self, *args, **kwargs):
+        if self.code is None:
+            using = kwargs.get("using") or self._state.db or "default"
+            self.code = next_code("customers_customer_code_seq", using)
+        super().save(*args, **kwargs)
 
     def set_follow_up(self, enabled, base_date=None):
         self.follow_up_enabled = enabled

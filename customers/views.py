@@ -18,6 +18,7 @@ def customer_list(request):
     customers = Customer.objects.all().select_related('created_by')
     if q:
         customers = customers.filter(
+            Q(code__icontains=q) |
             Q(name__icontains=q) |
             Q(phone__icontains=q) |
             Q(personal_number__icontains=q) |
@@ -44,16 +45,43 @@ def customer_list(request):
 @require_perm(lambda u: u.can_manage_customers)
 def customer_create(request):
     form = CustomerForm(request.POST or None)
+
     if request.method == 'POST' and form.is_valid():
         customer = form.save(commit=False)
         customer.created_by = request.user
         customer.save()
+
         if customer.follow_up_enabled:
             customer.set_follow_up(True)
-            customer.save(update_fields=['follow_up_enabled', 'follow_up_date', 'reminder_sent_at', 'updated_at'])
-        messages.success(request, 'تم إضافة العميل وحفظ موعد المراجعة.' if customer.follow_up_enabled else 'تم إضافة العميل.')
+            customer.save(update_fields=[
+                'follow_up_enabled',
+                'follow_up_date',
+                'reminder_sent_at',
+                'updated_at',
+            ])
+
+        messages.success(
+            request,
+            'تم إضافة العميل وحفظ موعد المراجعة.'
+            if customer.follow_up_enabled
+            else 'تم إضافة العميل.'
+        )
+
+        next_url = request.GET.get('next') or request.POST.get('next')
+
+        if next_url == 'repair_receive':
+            from django.urls import reverse
+            from urllib.parse import urlencode
+            url = reverse('servicecenter:repair_receive')
+            return redirect(f'{url}?{urlencode({"customer": customer.pk})}')
+
         return redirect('customers:customer_list')
-    return render(request, 'customers/customer_form.html', {'form': form, 'title': 'إضافة عميل'})
+
+    return render(request, 'customers/customer_form.html', {
+        'form': form,
+        'title': 'إضافة عميل',
+        'next': request.GET.get('next', ''),
+    })
 
 
 @require_perm(lambda u: u.can_manage_customers)

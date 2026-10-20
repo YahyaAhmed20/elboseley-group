@@ -1,3 +1,6 @@
+
+from django.http import JsonResponse
+from django.db.models import Q
 from decimal import Decimal
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -120,10 +123,96 @@ def repair_list(request):
             'form': form
         }
     )
+    
+    
+    
+@require_perm(lambda u: u.can_manage_operations)
+def customer_search(request):
+    if not request.user.is_authenticated:
+        return JsonResponse([], safe=False, status=401)
+
+    q = request.GET.get('q', '').strip()
+
+    if len(q) < 2:
+        return JsonResponse([], safe=False)
+
+    customers = Customer.objects.filter(
+        Q(name__istartswith=q) |
+        Q(phone__istartswith=q)
+    ).order_by('name')[:10]
+
+    results = [
+        {
+            'id': customer.pk,
+            'name': customer.name,
+            'phone': customer.phone or '',
+            'label': f'{customer.name} - {customer.phone or "بدون هاتف"}',
+        }
+        for customer in customers
+    ]
+
+    return JsonResponse(results, safe=False)
+
+
+@require_perm(lambda u: u.can_manage_operations)
+def device_search(request):
+    if not request.user.is_authenticated:
+        return JsonResponse([], safe=False, status=401)
+
+    q = request.GET.get('q', '').strip()
+    customer_id = request.GET.get('customer_id', '').strip()
+
+    if len(q) < 1 or not customer_id:
+        return JsonResponse([], safe=False)
+
+    devices = Device.objects.select_related('customer').filter(
+        customer_id=customer_id
+    )
+
+    search_filter = (
+        Q(customer__name__icontains=q)
+        | Q(customer__phone__icontains=q)
+        | Q(device_type__icontains=q)
+        | Q(description__icontains=q)
+    )
+
+    if q.isdigit():
+        search_filter |= Q(code=int(q))
+
+    devices = devices.filter(search_filter).order_by('-created_at')[:10]
+
+    results = [
+        {
+            'id': device.pk,
+            'code': device.code,
+            'device_type': device.device_type,
+            'customer': device.customer.name,
+            'phone': device.customer.phone or '',
+            'label': (
+                f'#{device.code} - {device.device_type} - '
+                f'{device.customer.name} - {device.customer.phone or "بدون هاتف"}'
+            ),
+        }
+        for device in devices
+    ]
+
+    return JsonResponse(results, safe=False)
+
+
 
 @require_perm(lambda u: u.can_manage_operations)
 def repair_receive(request):
-    form = RepairReceiveForm(request.POST or None)
+    initial = {}
+    customer_id = request.GET.get('customer')
+
+    if customer_id and request.method == 'GET':
+        initial['customer_id'] = customer_id
+        initial['customer'] = customer_id
+
+    form = RepairReceiveForm(
+        request.POST or None,
+        initial=initial,
+    )
 
     if request.method == 'POST' and form.is_valid():
         customer = form.cleaned_data['customer']
@@ -131,12 +220,10 @@ def repair_receive(request):
         deposit = form.cleaned_data['deposit']
 
         with transaction.atomic():
-
             if existing:
                 device = existing
             else:
                 code = _next_code('device')
-
                 device = Device.objects.create(
                     code=code,
                     customer=customer,
@@ -152,7 +239,6 @@ def repair_receive(request):
                 created_by=request.user,
             )
 
-            # تسجيل العربون كتحصيل مالي فعلي
             if deposit > 0:
                 FinancialTransaction.objects.create(
                     transaction_type=FinancialTransaction.Type.INCOME,
@@ -164,12 +250,12 @@ def repair_receive(request):
 
         messages.success(
             request,
-            f'تم استلام الجهاز بكود {device.code}.'
+            f'تم استلام الجهاز بكود {device.code}.',
         )
 
         return redirect(
             'servicecenter:repair_receipt',
-            pk=order.pk
+            pk=order.pk,
         )
 
     return render(
@@ -177,8 +263,8 @@ def repair_receive(request):
         'servicecenter/repair_receive.html',
         {
             'form': form,
-            'title': 'إيصال استلام جهاز'
-        }
+            'title': 'إيصال استلام جهاز',
+        },
     )
 
 @require_perm(lambda u: u.can_manage_operations)

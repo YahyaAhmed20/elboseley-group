@@ -1,0 +1,109 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4" dir="rtl">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>فاتورة صرف رقم {{ issue.invoice_number }}</h3>
+
+        <div class="d-flex gap-2">
+            <a href="{% url 'inventory:stock_issue_edit' issue.pk %}"
+               class="btn btn-outline-warning">
+                تعديل الفاتورة
+            </a>
+
+            <a href="{% url 'inventory:stock_issue_list' %}"
+               class="btn btn-secondary">
+                رجوع للفواتير
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <strong>رقم الفاتورة:</strong>
+                    {{ issue.invoice_number }}
+                </div>
+
+                <div class="col-md-4">
+                    <strong>المستلم:</strong>
+                    {{ issue.recipient }}
+                </div>
+
+                <div class="col-md-4">
+                    <strong>نوع الصرف:</strong>
+                    {{ issue.get_issue_type_display }}
+                </div>
+
+                <div class="col-md-4">
+                    <strong>أنشأها:</strong>
+                    {{ issue.created_by }}
+                </div>
+
+                <div class="col-md-4">
+                    <strong>التاريخ:</strong>
+                    {{ issue.created_at|date:"Y-m-d H:i" }}
+                </div>
+
+                <div class="col-md-4">
+                    <strong>الإجمالي:</strong>
+                    {{ issue.total|floatformat:2 }}
+                </div>
+
+                {% if issue.notes %}
+                <div class="col-12">
+                    <strong>ملاحظات:</strong>
+                    {{ issue.notes }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>الصنف</th>
+                    <th>الكمية</th>
+                    <th>سعر الوحدة</th>
+                    <th>الإجمالي</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for line in issue.lines.all %}
+                <tr>
+                    <td>{{ line.item.name }}</td>
+                    <td>
+                        {{ line.qty }}
+                        {% if line.item.unit %}
+                            {{ line.item.unit.name }}
+                        {% endif %}
+                    </td>
+                    <td>{{ line.unit_price|floatformat:2 }}</td>
+                    <td>{{ line.line_total|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted">
+                        لا توجد أصناف في هذه الفاتورة.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+
+            <tfoot>
+                <tr>
+                    <th colspan="3">الإجمالي الكلي</th>
+                    <th>{{ issue.total|floatformat:2 }}</th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+</div>
+{% endblock %}

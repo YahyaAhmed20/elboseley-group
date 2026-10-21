@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>
+            {% if is_edit %}
+                تعديل فاتورة صرف رقم {{ issue.invoice_number }}
+            {% else %}
+                إنشاء فاتورة صرف
+            {% endif %}
+        </h3>
+        <a href="{% url 'inventory:stock_issue_list' %}" class="btn btn-outline-secondary">
+            رجوع للفواتير
+        </a>
+    </div>
+
+    <form method="post" id="issue-form">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+        
+{% if formset.non_form_errors %}
+    <div class="alert alert-danger">
+        {% for error in formset.non_form_errors %}
+            <div>{{ error }}</div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+{% for line in formset %}
+    {% if line.non_field_errors %}
+        <div class="alert alert-danger">
+            {% for error in line.non_field_errors %}
+                <div>{{ error }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endfor %}
+
+
+        <div class="card mb-4">
+            <div class="card-header">بيانات الفاتورة</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    {% for field in form %}
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ field.id_for_label }}">
+                                {{ field.label }}
+                            </label>
+                            {{ field }}
+                            {% for error in field.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>أصناف الفاتورة</span>
+                <button type="button" id="add-line" class="btn btn-sm btn-outline-primary">
+                    + إضافة صنف
+                </button>
+            </div>
+
+            <div class="card-body">
+                {{ formset.management_form }}
+
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle" id="lines-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>الصنف</th>
+                                <th style="min-width:120px">الكمية</th>
+                                <th style="min-width:140px">سعر الوحدة</th>
+                                <th style="min-width:120px">الإجمالي</th>
+                                <th>الإجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lines-body">
+                            {% for line in formset %}
+                                <tr class="issue-line">
+                                    {% for hidden in line.hidden_fields %}{{ hidden }}{% endfor %}
+                                    <td>
+                                        {{ line.item }}
+                                        {% for error in line.item.errors %}
+                                            <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                        {% if line.DELETE %}
+                                            <span class="d-none">{{ line.DELETE }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ line.qty }}
+                                        {% for error in line.qty.errors %}
+                                            <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        {{ line.unit_price }}
+                                        {% for error in line.unit_price.errors %}
+                                            <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </td>
+                                    <td class="line-total">0.00</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-danger delete-line">
+                                            حذف
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="3">الإجمالي الكلي</th>
+                                <th id="grand-total">0.00</th>
+                                <th></th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <template id="empty-line-template">
+                    <tr class="issue-line">
+                        {% with line=formset.empty_form %}
+                            {% for hidden in line.hidden_fields %}{{ hidden }}{% endfor %}
+                            <td>
+                                {{ line.item }}
+                                <span class="d-none">{{ line.DELETE }}</span>
+                            </td>
+                            <td>{{ line.qty }}</td>
+                            <td>{{ line.unit_price }}</td>
+                        {% endwith %}
+                        <td class="line-total">0.00</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-danger delete-line">
+                                حذف
+                            </button>
+                        </td>
+                    </tr>
+                </template>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-danger">
+                {% if is_edit %}
+                    حفظ التعديلات
+                {% else %}
+                    حفظ فاتورة الصرف
+                {% endif %}
+            </button>
+            <a href="{% url 'inventory:stock_issue_list' %}" class="btn btn-secondary">إلغاء</a>
+        </div>
+    </form>
+</div>
+
+<script>
+(function () {
+    const body = document.getElementById("lines-body");
+    const template = document.getElementById("empty-line-template");
+    const totalForms = document.getElementById("id_lines-TOTAL_FORMS");
+    const addButton = document.getElementById("add-line");
+    const grandTotal = document.getElementById("grand-total");
+    const maxForms = 10;
+    const saveButton = document.querySelector('button[type="submit"]');
+
+    function validateDuplicateItems() {
+        const seen = new Set();
+        let hasDuplicates = false;
+
+        body.querySelectorAll(".issue-line").forEach(row => {
+            row.classList.remove("table-danger");
+
+            if (deleted(row) || row.style.display === "none") return;
+
+            const itemSelect = row.querySelector('select[name$="-item"]');
+            if (!itemSelect || !itemSelect.value) return;
+
+            if (seen.has(itemSelect.value)) {
+                hasDuplicates = true;
+                row.classList.add("table-danger");
+            } else {
+                seen.add(itemSelect.value);
+            }
+        });
+
+        let warning = document.getElementById("duplicate-item-warning");
+
+        if (!warning) {
+            warning = document.createElement("div");
+            warning.id = "duplicate-item-warning";
+            warning.className = "alert alert-warning mt-2";
+            warning.textContent = "لا يمكن اختيار الصنف نفسه أكثر من مرة. احذف الصف المكرر أو غيّر الصنف.";
+            body.closest(".card-body").prepend(warning);
+        }
+
+        warning.classList.toggle("d-none", !hasDuplicates);
+
+        if (saveButton) {
+            saveButton.disabled = hasDuplicates;
+        }
+
+        return !hasDuplicates;
+    }
+
+    function deleted(row) {
+        const checkbox = row.querySelector('input[name$="-DELETE"]');
+        return checkbox && checkbox.checked;
+    }
+
+    function recalculate() {
+        let total = 0;
+
+        body.querySelectorAll(".issue-line").forEach(row => {
+            if (deleted(row) || row.style.display === "none") return;
+
+            const qty = parseFloat(row.querySelector('input[name$="-qty"]')?.value) || 0;
+            const price = parseFloat(row.querySelector('input[name$="-unit_price"]')?.value) || 0;
+            const lineTotal = qty * price;
+
+            row.querySelector(".line-total").textContent = lineTotal.toFixed(2);
+            total += lineTotal;
+        });
+
+        grandTotal.textContent = total.toFixed(2);
+        addButton.disabled = body.querySelectorAll(".issue-line:not([style*='display: none'])").length >= maxForms;
+        validateDuplicateItems();
+    }
+
+    addButton.addEventListener("click", function () {
+        const index = parseInt(totalForms.value, 10);
+        const html = template.innerHTML.replace(/__prefix__/g, index);
+        body.insertAdjacentHTML("beforeend", html);
+        totalForms.value = index + 1;
+        recalculate();
+    });
+
+    body.addEventListener("click", function (event) {
+        const button = event.target.closest(".delete-line");
+        if (!button) return;
+
+        const row = button.closest(".issue-line");
+        const checkbox = row.querySelector('input[name$="-DELETE"]');
+
+        if (checkbox) {
+            checkbox.checked = true;
+            row.style.setProperty("display", "none", "important");
+        } else {
+            row.remove();
+        }
+
+        recalculate();
+    });
+
+    body.addEventListener("input", recalculate);
+    body.addEventListener("change", recalculate);
+
+    document.querySelector("form").addEventListener("submit", function (event) {
+        if (!validateDuplicateItems()) {
+            event.preventDefault();
+        }
+    });
+
+    recalculate();
+})();
+</script>
+{% endblock %}

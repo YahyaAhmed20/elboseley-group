@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>فاتورة مشتريات جديدة</h2>
+        <a href="{% url 'purchases:invoice_list' %}" class="btn btn-outline-secondary">
+            العودة للفواتير
+        </a>
+    </div>
+
+    <form method="post" id="purchase-form">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+
+        {% if form.errors %}
+        <div class="alert alert-danger">
+            يرجى مراجعة بيانات الفاتورة.
+            {{ form.errors }}
+        </div>
+        {% endif %}
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">بيانات الفاتورة</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    {% for field in form %}
+                    <div class="col-md-6">
+                        <label for="{{ field.id_for_label }}" class="form-label">
+                            {{ field.label }}
+                        </label>
+                        {{ field }}
+                        {% for error in field.errors %}
+                        <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>أصناف الفاتورة</span>
+                <button type="button" class="btn btn-success btn-sm" id="add-line">
+                    + إضافة صنف
+                </button>
+            </div>
+
+            <div class="card-body">
+                {{ formset.management_form }}
+
+                {% if formset.non_form_errors %}
+                <div class="alert alert-danger">{{ formset.non_form_errors }}</div>
+                {% endif %}
+
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>الصنف</th>
+                                <th>الكمية</th>
+                                <th>سعر الوحدة</th>
+                                <th>الإجمالي</th>
+                                <th>إجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoice-lines">
+                            {% for line_form in formset %}
+                            <tr class="invoice-line">
+                                {% for hidden in line_form.hidden_fields %}
+                                    {{ hidden }}
+                                {% endfor %}
+                                <td>
+                                    {{ line_form.item }}
+                                    {% for error in line_form.item.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    {{ line_form.qty }}
+                                    {% for error in line_form.qty.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    {{ line_form.unit_price }}
+                                    {% for error in line_form.unit_price.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </td>
+                                <td class="line-total">0.00</td>
+                                <td>
+                                    <span style="display:none">
+                                        {{ line_form.DELETE }}
+                                    </span>
+                                    <button type="button" class="btn btn-outline-danger btn-sm remove-line">
+                                        حذف
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="text-end mt-3">
+                    <div>الإجمالي: <strong id="invoice-total">0.00</strong></div>
+                    <div>المتبقي: <strong id="invoice-remaining">0.00</strong></div>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg">
+            حفظ الفاتورة
+        </button>
+    </form>
+</div>
+
+<script>
+(function () {
+    const tableBody = document.getElementById("invoice-lines");
+    const addButton = document.getElementById("add-line");
+    const totalForms = document.getElementById("id_lines-TOTAL_FORMS");
+    const paymentType = document.getElementById("id_payment_type");
+    const paidAmount = document.getElementById("id_paid_amount");
+    const maxLines = 10;
+
+    function rows() {
+        return [...tableBody.querySelectorAll(".invoice-line")];
+    }
+
+    function activeRows() {
+        return rows().filter(row => {
+            const deleteField = row.querySelector('input[name$="-DELETE"]');
+            return !deleteField || !deleteField.checked;
+        });
+    }
+
+    function updateTotals() {
+        let total = 0;
+
+        activeRows().forEach(row => {
+            if (row.style.display === "none") return;
+
+            const qty = parseFloat(row.querySelector('[name$="-qty"]').value) || 0;
+            const price = parseFloat(row.querySelector('[name$="-unit_price"]').value) || 0;
+            const lineTotal = qty * price;
+
+            row.querySelector(".line-total").textContent = lineTotal.toFixed(2);
+            total += lineTotal;
+        });
+
+        document.getElementById("invoice-total").textContent = total.toFixed(2);
+
+        const paid = parseFloat(paidAmount.value) || 0;
+        document.getElementById("invoice-remaining").textContent =
+            Math.max(0, total - paid).toFixed(2);
+
+        if (paymentType.value === "cash") {
+            paidAmount.value = total.toFixed(2);
+        } else if (paymentType.value === "credit") {
+            paidAmount.value = "0.00";
+        }
+
+        document.getElementById("invoice-remaining").textContent =
+            Math.max(0, total - (parseFloat(paidAmount.value) || 0)).toFixed(2);
+
+        addButton.disabled = activeRows().length >= maxLines;
+    }
+
+    function renumberRows() {
+        // Keep original form indices stable for Django formset.
+        totalForms.value = rows().length;
+        updateTotals();
+    }
+
+    addButton.addEventListener("click", function () {
+        const currentRows = rows();
+        const activeCount = activeRows().length;
+
+        if (activeCount >= maxLines) return;
+
+        const templateRow = currentRows[0];
+        const newRow = templateRow.cloneNode(true);
+        const newIndex = currentRows.length;
+
+        newRow.querySelectorAll("input, select, textarea").forEach(element => {
+            ["name", "id"].forEach(attribute => {
+                const value = element.getAttribute(attribute);
+                if (value) {
+                    element.setAttribute(
+                        attribute,
+                        value.replace(/lines-\d+-/, `lines-${newIndex}-`)
+                    );
+                }
+            });
+
+            if (element.type === "checkbox") {
+                element.checked = false;
+            } else if (element.tagName === "SELECT") {
+                element.selectedIndex = 0;
+            } else {
+                element.value = "";
+            }
+
+            element.classList.remove("is-invalid");
+        });
+
+        newRow.style.display = "";
+        newRow.querySelector(".line-total").textContent = "0.00";
+
+        tableBody.appendChild(newRow);
+        totalForms.value = rows().length;
+        updateTotals();
+    });
+
+    tableBody.addEventListener("click", function (event) {
+        const removeButton = event.target.closest(".remove-line");
+        if (!removeButton || !tableBody.contains(removeButton)) return;
+
+        const row = removeButton.closest(".invoice-line");
+        if (!row) return;
+
+        const visibleRows = rows().filter(
+            currentRow => currentRow.style.display !== "none"
+        );
+
+        if (visibleRows.length <= 1) {
+            alert("يجب أن تحتوي الفاتورة على صنف واحد على الأقل.");
+            return;
+        }
+
+        const deleteField = row.querySelector('input[name$="-DELETE"]');
+        if (!deleteField) {
+            alert("تعذر حذف الصف؛ حقل الحذف غير موجود.");
+            return;
+        }
+
+        deleteField.checked = true;
+        row.style.setProperty("display", "none", "important");
+
+        updateTotals();
+    });
+
+    tableBody.addEventListener("input", updateTotals);
+    tableBody.addEventListener("change", updateTotals);
+    paymentType.addEventListener("change", updateTotals);
+    paidAmount.addEventListener("input", updateTotals);
+
+    document.querySelectorAll("#purchase-form input, #purchase-form select").forEach(element => {
+        element.classList.add("form-control");
+    });
+
+    document.querySelectorAll("#purchase-form select").forEach(element => {
+        element.classList.add("form-select");
+    });
+
+    updateTotals();
+})();
+</script>
+{% endblock %}

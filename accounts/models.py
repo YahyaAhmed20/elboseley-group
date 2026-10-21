@@ -2,6 +2,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+
 class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN  = 'admin',  'مدير'
@@ -23,3 +24,19 @@ class User(AbstractUser):
     def can_manage_customers(self): return self.role == self.Role.ADMIN
     @property
     def can_manage_operations(self): return self.role == self.Role.ADMIN
+
+    @property
+    def can_manage_purchases(self):
+        return self.role in (self.Role.ADMIN, self.Role.KEEPER)
+
+    @property
+    def can_view_cashbox(self):
+        return self.role in (
+            self.Role.ADMIN,
+            self.Role.KEEPER,
+            self.Role.VIEWER,
+        )
+
+    @property
+    def can_manage_cashbox(self):
+        return self.role == self.Role.ADMIN

@@ -6,6 +6,7 @@
   <div class="card">
     <form method="post">
       {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
       {% for field in form %}
         {% if field.name == 'follow_up_enabled' %}
           <div class="field" style="display:flex;align-items:center;gap:10px">
@@ -23,7 +24,10 @@
       {% endfor %}
       <div style="display:flex;gap:8px">
         <button class="btn" type="submit">حفظ</button>
-        <a class="btn ghost" href="{% url 'customers:customer_list' %}">إلغاء</a>
+        <a class="btn ghost"
+           href="{% if next == 'repair_receive' %}{% url 'servicecenter:repair_list' %}{% else %}{% url 'customers:customer_list' %}{% endif %}">
+          إلغاء
+        </a>
       </div>
     </form>
   </div>

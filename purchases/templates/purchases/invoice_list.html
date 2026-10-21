@@ -1,0 +1,83 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>فواتير المشتريات</h2>
+        <a href="{% url 'purchases:invoice_create' %}"
+           class="btn btn-primary">
+            + فاتورة جديدة
+        </a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>رقم الفاتورة</th>
+                            <th>المورد</th>
+                            <th>نوع الدفع</th>
+                            <th>الإجمالي</th>
+                            <th>المدفوع</th>
+                            <th>المتبقي</th>
+                            <th>تاريخ الإنشاء</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for invoice in page_obj %}
+                        <tr>
+                            <td>{{ invoice.invoice_number }}</td>
+                            <td>{{ invoice.supplier.name }}</td>
+                            <td>{{ invoice.get_payment_type_display }}</td>
+                            <td>{{ invoice.total|floatformat:2 }}</td>
+                            <td>{{ invoice.paid_amount|floatformat:2 }}</td>
+                            <td>{{ invoice.remaining_amount|floatformat:2 }}</td>
+                            <td>{{ invoice.created_at|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4">
+                                لا توجد فواتير مشتريات حتى الآن.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if page_obj.has_other_pages %}
+            <nav aria-label="ترقيم الصفحات">
+                <ul class="pagination justify-content-center mt-3">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link"
+                           href="?page={{ page_obj.previous_page_number }}">
+                            السابق
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link"
+                           href="?page={{ page_obj.next_page_number }}">
+                            التالي
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

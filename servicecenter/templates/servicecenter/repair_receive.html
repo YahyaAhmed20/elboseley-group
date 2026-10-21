@@ -9,33 +9,39 @@
         {% csrf_token %}
 
         <div class="row" style="align-items:flex-start">
-            {% for field in form %}
-                <div style="flex:1;min-width:260px" class="field">
-                    <label>{{ field.label }}</label>
+            
+{% for field in form %}
+    {% if field.is_hidden %}
+        {{ field }}
+    {% else %}
+        <div style="flex:1;min-width:260px" class="field">
+            <label>{{ field.label }}</label>
 
-                    {% if field.name == 'customer' %}
-                        <div style="position:relative">
-                            {{ field }}
-                            <div id="customer-suggestions"
-                                 style="display:none;position:absolute;top:100%;right:0;left:0;z-index:20;background:var(--card);border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto">
-                            </div>
-                        </div>
-                    {% elif field.name == 'existing_device' %}
-                        <div style="position:relative">
-                            {{ field }}
-                            <div id="device-suggestions"
-                                 style="display:none;position:absolute;top:100%;right:0;left:0;z-index:20;background:var(--card);border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto">
-                            </div>
-                        </div>
-                    {% else %}
-                        {{ field }}
-                    {% endif %}
-
-                    {% for e in field.errors %}
-                        <div style="color:var(--bad)">{{ e }}</div>
-                    {% endfor %}
+            {% if field.name == 'customer' %}
+                <div style="position:relative">
+                    {{ field }}
+                    <div id="customer-suggestions"
+                         style="display:none;position:absolute;top:100%;right:0;left:0;z-index:20;background:var(--card);border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto">
+                    </div>
                 </div>
+            {% elif field.name == 'existing_device' %}
+                <div style="position:relative">
+                    {{ field }}
+                    <div id="device-suggestions"
+                         style="display:none;position:absolute;top:100%;right:0;left:0;z-index:20;background:var(--card);border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto">
+                    </div>
+                </div>
+            {% else %}
+                {{ field }}
+            {% endif %}
+
+            {% for e in field.errors %}
+                <div style="color:var(--bad)">{{ e }}</div>
             {% endfor %}
+        </div>
+    {% endif %}
+{% endfor %}
+
         </div>
 
         <div class="row-sub">

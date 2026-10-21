@@ -109,9 +109,15 @@
 
     <div class="line"></div>
 
-    <div class="actions">
-        <button onclick="printReceipt()">🖨️ طباعة الإيصال</button>
-    </div>
+    
+<div class="actions">
+    <button type="button" onclick="printReceipt()">🖨️ طباعة الإيصال</button>
+
+    <button type="button" onclick="window.location.href='{% url 'servicecenter:repair_list' %}'">
+        ↩ الرجوع إلى الصيانة
+    </button>
+</div>
+
 
    <script>
 const printerName = "Argox OS-2130D PPLA";

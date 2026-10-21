@@ -1,0 +1,40 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4" dir="rtl">
+    <div class="card border-danger">
+        <div class="card-header bg-danger text-white">
+            <h4 class="mb-0">تأكيد حذف فاتورة الصرف</h4>
+        </div>
+
+        <div class="card-body">
+            <p>
+                هل أنت متأكد أنك تريد حذف فاتورة الصرف رقم
+                <strong>{{ issue.invoice_number }}</strong>؟
+            </p>
+
+            <p>
+                المستلم: <strong>{{ issue.recipient }}</strong>
+            </p>
+
+            <p class="text-danger">
+                سيتم حذف الفاتورة وبنودها وحركات الصرف المرتبطة بها،
+                واستعادة الكميات إلى رصيد المخزون.
+            </p>
+
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                    تأكيد الحذف
+                </button>
+
+                <a href="{% url 'inventory:stock_issue_list' %}"
+                   class="btn btn-secondary">
+                    إلغاء
+                </a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

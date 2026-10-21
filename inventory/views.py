@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -7,12 +9,21 @@ from django.shortcuts import get_object_or_404, render, redirect
 
 from accounts.decorators import require_perm
 from catalog.models import Item
-from .forms import MovementForm
-from .models import StockMovement
+from .forms import (
+    MovementForm,
+    StockIssueForm,
+    StockIssueLineFormSet,
+    StockIssueEditLineFormSet,
+
+)
+from .models import StockMovement, StockIssue
 from .services import (
     create_movement,
     update_movement,
     delete_movement,
+    create_stock_issue,
+    update_stock_issue,
+    delete_stock_issue,
 )
 
 
@@ -215,4 +226,191 @@ def movement_delete(request, pk):
         {
             'movement': movement,
         },
+    )
+
+
+@require_perm(lambda u: u.can_move)
+def stock_issue_list(request):
+    issues = (
+        StockIssue.objects
+        .select_related("created_by")
+        .prefetch_related("lines__item")
+    )
+
+    q = request.GET.get("q", "").strip()
+    if q:
+        issues = issues.filter(
+            Q(invoice_number__icontains=q)
+            | Q(recipient__icontains=q)
+            | Q(notes__icontains=q)
+        )
+
+    paginator = Paginator(issues, 10)
+    page = paginator.get_page(request.GET.get("page"))
+
+    return render(request, "inventory/stock_issue_list.html", {
+        "issues": page,
+        "page_obj": page,
+        "q": q,
+    })
+
+
+@require_perm(lambda u: u.can_move)
+def stock_issue_create(request):
+    form = StockIssueForm(request.POST or None)
+    formset = StockIssueLineFormSet(
+        request.POST or None,
+        prefix="lines",
+    )
+
+    if request.method == "POST" and form.is_valid() and formset.is_valid():
+        lines = [
+            {
+                "item_id": line["item"].pk,
+                "qty": line["qty"],
+                "unit_price": line["unit_price"],
+            }
+            for line in formset.cleaned_data
+            if line and not line.get("DELETE", False)
+        ]
+
+        try:
+            issue = create_stock_issue(
+                invoice_number=form.cleaned_data["invoice_number"],
+                recipient=form.cleaned_data["recipient"],
+                issue_type=form.cleaned_data["issue_type"],
+                notes=form.cleaned_data["notes"],
+                lines=lines,
+                user=request.user,
+            )
+            messages.success(request, f"تم إنشاء فاتورة الصرف {issue.invoice_number} بنجاح.")
+            return redirect("inventory:stock_issue_list")
+
+        except ValidationError as exc:
+            if hasattr(exc, "message_dict"):
+                for field, errors in exc.message_dict.items():
+                    form.add_error(field if field in form.fields else None, errors)
+            else:
+                form.add_error(None, exc.messages)
+
+    return render(request, "inventory/stock_issue_form.html", {
+        "form": form,
+        "formset": formset,
+    })
+@require_perm(lambda u: u.can_move)
+def stock_issue_edit(request, pk):
+    issue = get_object_or_404(
+        StockIssue.objects.prefetch_related("lines__item"),
+        pk=pk,
+    )
+
+    initial_lines = [
+        {
+            "item": line.item_id,
+            "qty": line.qty,
+            "unit_price": line.unit_price,
+        }
+        for line in issue.lines.all()
+    ]
+
+    form = StockIssueForm(
+        request.POST or None,
+        instance=issue,
+    )
+
+    formset_class = StockIssueEditLineFormSet
+
+    formset = formset_class(
+        request.POST or None,
+        prefix="lines",
+        initial=initial_lines if request.method != "POST" else None,
+    )
+    if request.method == "POST" and form.is_valid() and formset.is_valid():
+        lines = [
+            {
+                "item_id": line["item"].pk,
+                "qty": line["qty"],
+                "unit_price": line["unit_price"],
+            }
+            for line in formset.cleaned_data
+            if line and not line.get("DELETE", False)
+        ]
+
+        try:
+            updated_issue = update_stock_issue(
+                issue_id=issue.pk,
+                invoice_number=form.cleaned_data["invoice_number"],
+                recipient=form.cleaned_data["recipient"],
+                issue_type=form.cleaned_data["issue_type"],
+                notes=form.cleaned_data["notes"],
+                lines=lines,
+            )
+
+            messages.success(
+                request,
+                f"تم تعديل فاتورة الصرف {updated_issue.invoice_number} بنجاح.",
+            )
+            return redirect("inventory:stock_issue_list")
+
+        except ValidationError as exc:
+            if hasattr(exc, "message_dict"):
+                for field, errors in exc.message_dict.items():
+                    form.add_error(
+                        field if field in form.fields else None,
+                        errors,
+                    )
+            else:
+                form.add_error(None, exc.messages)
+
+    return render(request, "inventory/stock_issue_form.html", {
+        "form": form,
+        "formset": formset,
+        "issue": issue,
+        "is_edit": True,
+    })
+
+
+@require_perm(lambda u: u.can_move)
+def stock_issue_delete(request, pk):
+    issue = get_object_or_404(StockIssue, pk=pk)
+
+    if request.method == "POST":
+        try:
+            invoice_number = issue.invoice_number
+            delete_stock_issue(issue_id=issue.pk)
+
+            messages.success(
+                request,
+                f"تم حذف فاتورة الصرف {invoice_number} واستعادة الكميات للمخزون.",
+            )
+
+        except ValidationError as exc:
+            messages.error(request, str(exc))
+
+        return redirect("inventory:stock_issue_list")
+
+    return render(
+        request,
+        "inventory/stock_issue_confirm_delete.html",
+        {"issue": issue},
+    )
+
+
+@require_perm(lambda u: u.can_move)
+def stock_issue_detail(request, pk):
+    issue = get_object_or_404(
+        StockIssue.objects.select_related("created_by").prefetch_related(
+            "lines__item",
+            "lines__item__unit",
+        ),
+        pk=pk,
+    )
+
+    for line in issue.lines.all():
+        line.line_total = line.qty * line.unit_price
+
+    return render(
+        request,
+        "inventory/stock_issue_detail.html",
+        {"issue": issue},
     )

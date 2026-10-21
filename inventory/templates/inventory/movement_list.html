@@ -5,13 +5,22 @@
 <div class="row">
   <div style="flex:1"></div>
   {% if user.can_move %}
-    <a class="btn g" href="{% url 'inventory:movement_create' 'in' %}">
+    <a class="btn g" href="{% url 'purchases:invoice_create' %}">
       <svg class="ico ico-sm"><use href="#i-in"/></svg>
-      استلام
+      استلام — فاتورة شراء
     </a>
-    <a class="btn r" href="{% url 'inventory:movement_create' 'out' %}">
+
+    <a class="btn r" href="{% url 'inventory:stock_issue_create' %}">
       <svg class="ico ico-sm"><use href="#i-out"/></svg>
-      صرف
+      صرف — فاتورة صرف
+    </a>
+
+    <a class="btn ghost" href="{% url 'purchases:invoice_list' %}">
+      فواتير الشراء
+    </a>
+
+    <a class="btn ghost" href="{% url 'inventory:stock_issue_list' %}">
+      فواتير الصرف
     </a>
   {% endif %}
 </div>
@@ -105,21 +114,25 @@
       <td>
         {% if user.can_move %}
           <div style="display:flex;gap:6px;white-space:nowrap">
+            {% if not m.purchase_line_id and not m.issue_line_id %}
+              <a
+                class="btn ghost"
+                href="{% url 'inventory:movement_edit' m.pk %}"
+              >
+                تعديل
+              </a>
 
-            <a
-              class="btn ghost"
-              href="{% url 'inventory:movement_edit' m.pk %}"
-            >
-              تعديل
-            </a>
-
-            <a
-              class="btn ghost"
-              href="{% url 'inventory:movement_delete' m.pk %}"
-            >
-              حذف
-            </a>
-
+              <a
+                class="btn ghost"
+                href="{% url 'inventory:movement_delete' m.pk %}"
+              >
+                حذف
+              </a>
+            {% elif m.purchase_line_id %}
+              <span class="chip">مرتبطة بفاتورة شراء</span>
+            {% elif m.issue_line_id %}
+              <span class="chip">مرتبطة بفاتورة صرف</span>
+            {% endif %}
           </div>
         {% endif %}
       </td>

@@ -207,7 +207,6 @@ def repair_receive(request):
 
     if customer_id and request.method == 'GET':
         initial['customer_id'] = customer_id
-        initial['customer'] = customer_id
 
     form = RepairReceiveForm(
         request.POST or None,

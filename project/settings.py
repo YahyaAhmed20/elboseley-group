@@ -48,6 +48,8 @@ CSRF_TRUSTED_ORIGINS = [
     if origin.strip()
 ]
 
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True

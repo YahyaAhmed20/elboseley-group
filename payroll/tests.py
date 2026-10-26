@@ -27,6 +27,8 @@ class PayrollTests(TestCase):
     def test_transactions_are_isolated_by_month(self):
         september = PayrollMonth.objects.create(year=2026, month=9)
         october = PayrollMonth.objects.create(year=2026, month=10)
+        sync_month_employee_payrolls(september)
+        sync_month_employee_payrolls(october)
         create_transaction(
             payroll_month=september, employee=self.employee,
             kind=PayrollTransaction.Kind.ADVANCE, amount=Decimal('1000'),

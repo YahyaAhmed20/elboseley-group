@@ -3,10 +3,18 @@ from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
 from payroll.models import Employee
+from finance.models import Account
 
 class ExpenseCategory(models.Model):
     name = models.CharField('البند', max_length=100, unique=True)
     is_active = models.BooleanField(default=True)
+    account = models.ForeignKey(
+        Account,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="expense_categories",
+    )
 
     class Meta:
         ordering = ['name']
@@ -23,6 +31,8 @@ class Expense(models.Model):
     note = models.TextField('ملاحظة', blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_cancelled = models.BooleanField(default=False)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-expense_date', '-created_at']

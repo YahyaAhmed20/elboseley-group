@@ -330,6 +330,15 @@
     <svg class="ico ico-sm"><use href="#i-chart"/></svg>
     التقارير
   </a>
+
+  {% if user.can_manage_operations %}
+  <a
+      class="tab {% if request.resolver_match.namespace == 'purchases' %}active{% endif %}"
+      href="{% url 'purchases:invoice_list' %}"
+  >
+      🧾 فواتير المشتريات
+  </a>
+  {% endif %}
   {% if user.can_manage_operations %}
     <a class="tab {% if request.resolver_match.namespace == 'servicecenter' %}active{% endif %}" href="{% url 'servicecenter:repair_list' %}">🔧 الصيانة</a>
     <a class="tab {% if request.resolver_match.namespace == 'supplier' %}active{% endif %}" href="{% url 'supplier:supplier_list' %}">🚚 الموردين</a>

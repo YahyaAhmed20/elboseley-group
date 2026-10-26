@@ -2,11 +2,18 @@ from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
+from django.utils import timezone
 from finance.services import validate_cashbox_expense
 from catalog.models import Item
 from finance.models import CashboxTransaction
 from inventory.models import StockMovement
 from supplier.models import Supplier
+from finance.services import (
+    validate_cashbox_expense,
+    ensure_default_accounts,
+    create_journal_entry,
+)
+
 
 from .models import (
     PurchaseInvoice,
@@ -195,4 +202,139 @@ def create_purchase_invoice(
             created_by=user,
         )
 
+    accounts = ensure_default_accounts()
+
+    journal_lines = [
+        {
+            "account_id": accounts["1200"].pk,
+            "debit": total,
+            "credit": Decimal("0.00"),
+            "description": f"إثبات مشتريات {invoice_number}",
+        },
+    ]
+
+    if paid_amount > 0:
+        journal_lines.append({
+            "account_id": accounts["1000"].pk,
+            "debit": Decimal("0.00"),
+            "credit": paid_amount,
+            "description": f"المبلغ المدفوع نقدًا {invoice_number}",
+        })
+
+    remaining_amount = total - paid_amount
+
+    if remaining_amount > 0:
+        journal_lines.append({
+            "account_id": accounts["2000"].pk,
+            "debit": Decimal("0.00"),
+            "credit": remaining_amount,
+            "description": f"المتبقي للمورد {invoice_number}",
+        })
+
+    create_journal_entry(
+        entry_number=f"PUR-{invoice.pk}",
+        entry_date=timezone.localdate(),
+        description=f"فاتورة مشتريات رقم {invoice_number}",
+        reference_type="purchase_invoice",
+        reference_id=invoice.pk,
+        user=user,
+        lines=journal_lines,
+    )
+
     return invoice
+
+
+
+
+
+@transaction.atomic
+def pay_purchase_invoice(*, invoice_id, amount, user, notes=""):
+    """Record a supplier payment against an existing purchase invoice."""
+    try:
+        amount = to_decimal(amount, "المبلغ المدفوع").quantize(
+            Decimal("0.01")
+        )
+    except ValidationError:
+        raise
+
+    if amount <= Decimal("0.00"):
+        raise ValidationError("المبلغ المدفوع يجب أن يكون أكبر من صفر.")
+
+    try:
+        invoice = (
+            PurchaseInvoice.objects.select_for_update()
+            .select_related("supplier")
+            .get(pk=invoice_id)
+        )
+    except PurchaseInvoice.DoesNotExist:
+        raise ValidationError("فاتورة الشراء غير موجودة.")
+
+    if not user or not getattr(user, "is_authenticated", False):
+        raise ValidationError("يجب تحديد مستخدم مسجل الدخول.")
+
+    remaining = invoice.remaining_amount
+
+    if remaining <= Decimal("0.00"):
+        raise ValidationError("الفاتورة مسددة بالكامل.")
+
+    if amount > remaining:
+        raise ValidationError(
+            f"المبلغ أكبر من المتبقي على الفاتورة ({remaining:.2f})."
+        )
+
+    validate_cashbox_expense(amount)
+
+    accounts = ensure_default_accounts()
+
+    new_paid_amount = invoice.paid_amount + amount
+    invoice.paid_amount = new_paid_amount
+
+    if new_paid_amount == invoice.total:
+        invoice.payment_type = PurchaseInvoice.PaymentType.CASH
+    elif new_paid_amount > Decimal("0.00"):
+        invoice.payment_type = PurchaseInvoice.PaymentType.PARTIAL
+
+    invoice.save(update_fields=["paid_amount", "payment_type"])
+
+    payment = CashboxTransaction.objects.create(
+        kind=CashboxTransaction.Kind.EXPENSE,
+        amount=amount,
+        description=f"سداد للمورد عن فاتورة #{invoice.invoice_number}",
+        purchase_invoice=invoice,
+        created_by=user,
+    )
+
+    SupplierAccountEntry.objects.create(
+        supplier=invoice.supplier,
+        invoice=invoice,
+        entry_type=SupplierAccountEntry.EntryType.PAYMENT,
+        debit=amount,
+        credit=Decimal("0.00"),
+        notes=notes or f"سداد لاحق للفاتورة #{invoice.invoice_number}",
+        created_by=user,
+    )
+
+    create_journal_entry(
+        entry_number=f"PAY-{payment.pk}",
+        entry_date=timezone.localdate(),
+        description=f"سداد فاتورة مشتريات #{invoice.invoice_number}",
+        reference_type="purchase_payment",
+        reference_id=payment.pk,
+        user=user,
+        lines=[
+            {
+                "account_id": accounts["2000"].pk,
+                "debit": amount,
+                "credit": Decimal("0.00"),
+                "description": "تخفيض مديونية المورد",
+            },
+            {
+                "account_id": accounts["1000"].pk,
+                "debit": Decimal("0.00"),
+                "credit": amount,
+                "description": "صرف من الخزنة",
+            },
+        ],
+    )
+
+    return payment

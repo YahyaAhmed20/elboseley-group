@@ -66,3 +66,25 @@ class PurchaseInvoiceLineForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["item"].queryset = Item.objects.filter(is_active=True)
+
+
+
+
+
+class SupplierPaymentForm(forms.Form):
+    amount = forms.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=0.01,
+        label="مبلغ السداد",
+        widget=forms.NumberInput(attrs={
+            "step": "0.01",
+            "min": "0.01",
+            "placeholder": "أدخل مبلغ السداد",
+        }),
+    )
+    notes = forms.CharField(
+        required=False,
+        label="ملاحظات",
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )

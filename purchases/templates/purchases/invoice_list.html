@@ -1,83 +1,132 @@
-
 {% extends "base.html" %}
 
+{% block title %}فواتير المشتريات{% endblock %}
+
 {% block content %}
-<div class="container-fluid py-4" dir="rtl">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>فواتير المشتريات</h2>
-        <a href="{% url 'purchases:invoice_create' %}"
-           class="btn btn-primary">
-            + فاتورة جديدة
-        </a>
+<div class="row" style="justify-content:space-between;align-items:center">
+    <div>
+        <h2 style="margin:0 0 5px">فواتير المشتريات</h2>
+        <div class="row-sub">متابعة فواتير الموردين والمبالغ المستحقة</div>
     </div>
 
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead>
-                        <tr>
-                            <th>رقم الفاتورة</th>
-                            <th>المورد</th>
-                            <th>نوع الدفع</th>
-                            <th>الإجمالي</th>
-                            <th>المدفوع</th>
-                            <th>المتبقي</th>
-                            <th>تاريخ الإنشاء</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for invoice in page_obj %}
-                        <tr>
-                            <td>{{ invoice.invoice_number }}</td>
-                            <td>{{ invoice.supplier.name }}</td>
-                            <td>{{ invoice.get_payment_type_display }}</td>
-                            <td>{{ invoice.total|floatformat:2 }}</td>
-                            <td>{{ invoice.paid_amount|floatformat:2 }}</td>
-                            <td>{{ invoice.remaining_amount|floatformat:2 }}</td>
-                            <td>{{ invoice.created_at|date:"Y-m-d H:i" }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="7" class="text-center py-4">
-                                لا توجد فواتير مشتريات حتى الآن.
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    <a href="{% url 'purchases:invoice_create' %}" class="btn">
+        <svg class="ico ico-sm"><use href="#i-plus"/></svg>
+        فاتورة جديدة
+    </a>
+</div>
 
-            {% if page_obj.has_other_pages %}
-            <nav aria-label="ترقيم الصفحات">
-                <ul class="pagination justify-content-center mt-3">
-                    {% if page_obj.has_previous %}
-                    <li class="page-item">
-                        <a class="page-link"
-                           href="?page={{ page_obj.previous_page_number }}">
-                            السابق
-                        </a>
-                    </li>
-                    {% endif %}
-
-                    <li class="page-item active">
-                        <span class="page-link">
-                            {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}
-                        </span>
-                    </li>
-
-                    {% if page_obj.has_next %}
-                    <li class="page-item">
-                        <a class="page-link"
-                           href="?page={{ page_obj.next_page_number }}">
-                            التالي
-                        </a>
-                    </li>
-                    {% endif %}
-                </ul>
-            </nav>
-            {% endif %}
-        </div>
+<form class="filters" method="get">
+    <div class="filter-search">
+        <input
+            type="text"
+            name="q"
+            placeholder="ابحث برقم الفاتورة"
+            value="{{ request.GET.q|default:'' }}"
+        >
     </div>
+
+    <select name="supplier">
+        <option value="">كل الموردين</option>
+        {% for supplier in suppliers %}
+            <option
+                value="{{ supplier.pk }}"
+                {% if selected_supplier == supplier.pk|stringformat:"s" %}selected{% endif %}
+            >
+                {{ supplier.name }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <button class="btn ghost" type="submit">تصفية</button>
+    <a class="btn ghost" href="{% url 'purchases:invoice_list' %}">
+        إعادة ضبط
+    </a>
+</form>
+
+<div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:18px;border-bottom:1px solid var(--line)">
+        <strong>سجل الفواتير</strong>
+    </div>
+
+    <div style="overflow-x:auto">
+        <table>
+            <thead>
+                <tr>
+                    <th>رقم الفاتورة</th>
+                    <th>المورد</th>
+                    <th>نوع الدفع</th>
+                    <th>الإجمالي</th>
+                    <th>المدفوع</th>
+                    <th>المتبقي</th>
+                    <th>تاريخ الإنشاء</th>
+                    <th>الحالة والإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for invoice in page_obj %}
+                <tr>
+                    <td><strong>{{ invoice.invoice_number }}</strong></td>
+                    <td>{{ invoice.supplier.name }}</td>
+                    <td>{{ invoice.get_payment_type_display }}</td>
+                    <td>{{ invoice.total|floatformat:2 }} ج.م</td>
+                    <td>{{ invoice.paid_amount|floatformat:2 }} ج.م</td>
+                    <td>
+                        <strong>{{ invoice.remaining_amount|floatformat:2 }} ج.م</strong>
+                    </td>
+                    <td>{{ invoice.created_at|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        {% if invoice.remaining_amount <= 0 %}
+                            <span class="badge b-ok">مسددة بالكامل</span>
+                        {% else %}
+                            <span class="badge b-warn">مستحق</span>
+                            {% if request.user.can_manage_cashbox %}
+                                <div style="margin-top:8px">
+                                    <a href="{% url 'purchases:invoice_pay' invoice.pk %}"
+                                       class="btn sm">
+                                        سداد الفاتورة
+                                    </a>
+                                </div>
+                            {% else %}
+                                <div class="row-sub" style="margin-top:6px">
+                                    لا تملك صلاحية السداد
+                                </div>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8">
+                        <div class="empty">
+                            لا توجد فواتير مشتريات حتى الآن.
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="pagination">
+        {% if page_obj.has_previous %}
+            <a class="page-btn"
+               href="?page={{ page_obj.previous_page_number }}">السابق</a>
+        {% else %}
+            <span class="page-btn disabled">السابق</span>
+        {% endif %}
+
+        <span class="page-btn active">
+            {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}
+        </span>
+
+        {% if page_obj.has_next %}
+            <a class="page-btn"
+               href="?page={{ page_obj.next_page_number }}">التالي</a>
+        {% else %}
+            <span class="page-btn disabled">التالي</span>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

@@ -16,3 +16,18 @@ media/
 
 # VSCode
 .vscode/
+# Local databases and backups
+db_local.sqlite3
+db_local_backup_*.sqlite3
+*.sqlite3
+*.sqlite3-journal
+*.bak
+
+# Local-only Django settings
+project/local_settings.py
+
+# Temporary review and validation files
+local_check_invalid_partial.py
+test_invalid_lines.py
+phase1_templates.txt
+review_files.txt

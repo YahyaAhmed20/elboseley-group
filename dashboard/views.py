@@ -54,8 +54,6 @@ def index(request):
         'has_filter':   bool(q),
         'filtered_count': len(all_alerts),
     })
-
-
 @login_required
 def reports(request):
     from django.db.models import Q, Sum
@@ -65,71 +63,137 @@ def reports(request):
     from expenses.models import Expense
     from servicecenter.models import RepairOrder
     from finance.models import FinancialTransaction
+    from purchases.models import SupplierAccountEntry
 
-    q = request.GET.get('q', '').strip()
-    employee_id = request.GET.get('employee', '').strip()
-    customer_id = request.GET.get('customer', '').strip()
-    supplier_id = request.GET.get('supplier', '').strip()
+    q = request.GET.get("q", "").strip()
+    employee_id = request.GET.get("employee", "").strip()
+    customer_id = request.GET.get("customer", "").strip()
+    supplier_id = request.GET.get("supplier", "").strip()
 
-    delivered = RepairOrder.objects.filter(status=RepairOrder.Status.DELIVERED)
-    if q:
-        report_q = Q(device__customer__name__icontains=q) | Q(device__customer__phone__icontains=q) | Q(employee__name__icontains=q)
-        if q.isdigit(): report_q |= Q(device__code=int(q))
-        delivered = delivered.filter(report_q)
-    if employee_id: delivered = delivered.filter(employee_id=employee_id)
-    if customer_id: delivered = delivered.filter(device__customer_id=customer_id)
-
-    repair_revenue = sum(
-        (o.total for o in delivered),
-        Decimal('0')
+    # أعمال الصيانة المسلّمة
+    delivered = RepairOrder.objects.filter(
+        status=RepairOrder.Status.DELIVERED
     )
 
-    repair_cost = delivered.aggregate(
-        v=Sum('cost')
-    )['v'] or Decimal('0')
+    if q:
+        report_q = (
+            Q(device__customer__name__icontains=q)
+            | Q(device__customer__phone__icontains=q)
+            | Q(employee__name__icontains=q)
+        )
+        if q.isdigit():
+            report_q |= Q(device__code=int(q))
+        delivered = delivered.filter(report_q)
+
+    if employee_id.isdigit():
+        delivered = delivered.filter(employee_id=int(employee_id))
+
+    if customer_id.isdigit():
+        delivered = delivered.filter(
+            device__customer_id=int(customer_id)
+        )
+
+    repair_revenue = sum(
+        (order.total for order in delivered),
+        Decimal("0.00"),
+    )
+
+    repair_cost = (
+        delivered.aggregate(value=Sum("cost"))["value"]
+        or Decimal("0.00")
+    )
 
     repair_profit = repair_revenue - repair_cost
 
-    deposits = delivered.aggregate(
-        v=Sum('deposit')
-    )['v'] or Decimal('0')
+    deposits = (
+        delivered.aggregate(value=Sum("deposit"))["value"]
+        or Decimal("0.00")
+    )
 
-    # إجمالي المقبوض فعليًا من Finance
-    collected = FinancialTransaction.objects.filter(
-        transaction_type=FinancialTransaction.Type.INCOME,
-        repair_order__in=delivered
-    ).aggregate(
-        v=Sum('amount')
-    )['v'] or Decimal('0')
+    collected = (
+        FinancialTransaction.objects.filter(
+            transaction_type=FinancialTransaction.Type.INCOME,
+            repair_order__in=delivered,
+        ).aggregate(value=Sum("amount"))["value"]
+        or Decimal("0.00")
+    )
 
-    expenses = Expense.objects.all()
-    if employee_id: expenses = expenses.filter(beneficiary_id=employee_id)
-    if q: expenses = expenses.filter(Q(beneficiary__name__icontains=q)|Q(category__name__icontains=q)|Q(note__icontains=q))
-    total_expenses = expenses.aggregate(v=Sum('amount'))['v'] or Decimal('0')
+    # المصروفات النشطة فقط، مع الاحتفاظ بالفلاتر
+    expenses = Expense.objects.filter(is_cancelled=False)
+
+    if employee_id.isdigit():
+        expenses = expenses.filter(
+            beneficiary_id=int(employee_id)
+        )
+
+    if q:
+        expenses = expenses.filter(
+            Q(beneficiary__name__icontains=q)
+            | Q(category__name__icontains=q)
+            | Q(note__icontains=q)
+        )
+
+    total_expenses = (
+        expenses.aggregate(value=Sum("amount"))["value"]
+        or Decimal("0.00")
+    )
+
+    # هذا صافي نشاط الصيانة وفق المعادلة الحالية
     net_profit = repair_profit - total_expenses
 
+    # رصيد الموردين = أول المدة + المشتريات - المدفوعات
     supplier_qs = Supplier.objects.filter(is_active=True)
-    if supplier_id: supplier_qs = supplier_qs.filter(id=supplier_id)
-    supplier_balance = supplier_qs.aggregate(v=Sum('opening_balance'))['v'] or Decimal('0')
-    employees = Employee.objects.filter(status=Employee.Status.ACTIVE)
-    customers = Customer.objects.all().order_by('name')
-    return render(request, 'dashboard/reports.html', {
-        'repair_count': delivered.count(),
-        'repair_revenue': repair_revenue,
-        'collected': collected,
-        'repair_cost': repair_cost,
-        'repair_profit': repair_profit,
-        'deposits': deposits,
-        'total_expenses': total_expenses,
-        'net_profit': net_profit,
-        'expenses': expenses.select_related('beneficiary', 'category')[:20],
-        'delivered': delivered[:20],
-        'employees': employees,
-        'customers': customers,
-        'suppliers': supplier_qs,
-        'supplier_balance': supplier_balance,
-        'q': q,
-        'employee_id': employee_id,
-        'customer_id': customer_id,
-        'supplier_id': supplier_id,
-    })
+
+    if supplier_id.isdigit():
+        supplier_qs = supplier_qs.filter(
+            pk=int(supplier_id)
+        )
+    else:
+        supplier_id = ""
+
+    supplier_qs = supplier_qs.annotate(
+        total_purchases=Sum("account_entries__credit"),
+        total_paid=Sum("account_entries__debit"),
+    )
+
+    supplier_balance = sum(
+        (
+            supplier.opening_balance
+            + (supplier.total_purchases or Decimal("0.00"))
+            - (supplier.total_paid or Decimal("0.00"))
+            for supplier in supplier_qs
+        ),
+        Decimal("0.00"),
+    )
+
+    employees = Employee.objects.filter(
+        status=Employee.Status.ACTIVE
+    )
+    customers = Customer.objects.all().order_by("name")
+
+    return render(
+        request,
+        "dashboard/reports.html",
+        {
+            "repair_count": delivered.count(),
+            "repair_revenue": repair_revenue,
+            "collected": collected,
+            "repair_cost": repair_cost,
+            "repair_profit": repair_profit,
+            "deposits": deposits,
+            "total_expenses": total_expenses,
+            "net_profit": net_profit,
+            "expenses": expenses.select_related(
+                "beneficiary", "category"
+            )[:20],
+            "delivered": delivered[:20],
+            "employees": employees,
+            "customers": customers,
+            "suppliers": supplier_qs,
+            "supplier_balance": supplier_balance,
+            "q": q,
+            "employee_id": employee_id,
+            "customer_id": customer_id,
+            "supplier_id": supplier_id,
+        },
+    )

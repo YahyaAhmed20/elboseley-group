@@ -1,0 +1,94 @@
+
+{% extends "base.html" %}
+
+{% block title %}سداد فاتورة مورد{% endblock %}
+
+{% block content %}
+<div class="row" style="justify-content:space-between;align-items:center">
+    <div>
+        <h2 style="margin:0 0 5px">سداد فاتورة مورد</h2>
+        <div class="row-sub">
+            {{ invoice.supplier.name }} — فاتورة رقم {{ invoice.invoice_number }}
+        </div>
+    </div>
+
+    <a class="btn ghost" href="{% url 'purchases:invoice_list' %}">
+        العودة للفواتير
+    </a>
+</div>
+
+<div class="grid2" style="margin-bottom:20px">
+    <div class="card">
+        <div class="row-sub">إجمالي الفاتورة</div>
+        <div style="font-size:24px;font-weight:800;margin-top:8px">
+            {{ invoice.total|floatformat:2 }}
+            <small style="font-size:12px;color:var(--dim)">جنيه</small>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="row-sub">المدفوع سابقًا</div>
+        <div style="font-size:24px;font-weight:800;margin-top:8px;color:var(--ok)">
+            {{ invoice.paid_amount|floatformat:2 }}
+            <small style="font-size:12px;color:var(--dim)">جنيه</small>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:20px;border-color:rgba(245,158,11,.35)">
+    <div class="row-sub">المبلغ المتبقي للسداد</div>
+    <div style="font-size:30px;font-weight:800;color:var(--warn);margin-top:6px">
+        {{ invoice.remaining_amount|floatformat:2 }}
+        <small style="font-size:13px">جنيه</small>
+    </div>
+</div>
+
+{% if invoice.remaining_amount > 0 %}
+<div class="card">
+    <h3 style="margin:0 0 6px">تسجيل دفعة جديدة</h3>
+    <p class="row-sub" style="margin-bottom:20px">
+        أدخل مبلغ الدفعة. لا يمكن أن يتجاوز المبلغ المتبقي على الفاتورة أو رصيد الخزينة.
+    </p>
+
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="card" style="margin-bottom:16px;border-color:var(--bad);color:var(--bad)">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+
+        <div class="field">
+            <label for="{{ form.amount.id_for_label }}">
+                {{ form.amount.label }}
+            </label>
+            {{ form.amount }}
+            {% for error in form.amount.errors %}
+                <div style="color:var(--bad);font-size:12px;margin-top:5px">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="field">
+            <label for="{{ form.notes.id_for_label }}">
+                {{ form.notes.label }}
+            </label>
+            {{ form.notes }}
+            {% for error in form.notes.errors %}
+                <div style="color:var(--bad);font-size:12px;margin-top:5px">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="row" style="margin-top:20px">
+            <button class="btn g" type="submit">تأكيد السداد</button>
+            <a class="btn ghost" href="{% url 'purchases:invoice_list' %}">إلغاء</a>
+        </div>
+    </form>
+</div>
+{% else %}
+<div class="card">
+    <span class="badge b-ok">مسددة بالكامل</span>
+    <p style="margin-bottom:0">تم سداد هذه الفاتورة بالكامل، ولا يوجد مبلغ مستحق عليها.</p>
+</div>
+{% endif %}
+{% endblock %}

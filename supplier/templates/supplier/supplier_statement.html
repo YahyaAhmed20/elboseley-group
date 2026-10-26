@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block title %}كشف حساب المورد{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div>
+        <h2>كشف حساب المورد: {{ supplier.name }}</h2>
+        <div class="row-sub">
+            كود المورد: {{ supplier.code|default:"-" }}
+            — الهاتف: {{ supplier.phone|default:"-" }}
+        </div>
+    </div>
+
+    <a class="btn ghost" href="{% url 'supplier:supplier_list' %}">
+        العودة للموردين
+    </a>
+</div>
+
+<div class="row">
+    <div>
+        <strong>رصيد أول المدة</strong>
+        <div>{{ supplier.opening_balance|floatformat:2 }} جنيه</div>
+    </div>
+    <div>
+        <strong>إجمالي المشتريات</strong>
+        <div>{{ total_purchases|floatformat:2 }} جنيه</div>
+    </div>
+    <div>
+        <strong>إجمالي المدفوع</strong>
+        <div>{{ total_paid|floatformat:2 }} جنيه</div>
+    </div>
+    <div>
+        <strong>الرصيد الحالي</strong>
+        <div>{{ current_balance|floatformat:2 }} جنيه</div>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table>
+        <thead>
+            <tr>
+                <th>التاريخ</th>
+                <th>نوع الحركة</th>
+                <th>الفاتورة</th>
+                <th>البيان</th>
+                <th>مدين</th>
+                <th>دائن</th>
+                <th>الرصيد بعد الحركة</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>{{ row.entry.created_at|date:"Y-m-d H:i" }}</td>
+                <td>{{ row.entry.get_entry_type_display }}</td>
+                <td>
+                    {% if row.entry.invoice %}
+                        <a
+                            href="{% url 'purchases:invoice_list' %}?supplier={{ supplier.pk }}"
+                            style="color:var(--acc);text-decoration:none"
+                        >
+                            {{ row.entry.invoice.invoice_number }}
+                        </a>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ row.entry.notes|default:"-" }}</td>
+                <td>{{ row.entry.debit|floatformat:2 }}</td>
+                <td>{{ row.entry.credit|floatformat:2 }}</td>
+                <td><strong>{{ row.balance|floatformat:2 }}</strong></td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7">
+                    لا توجد حركات مسجلة لهذا المورد حتى الآن.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

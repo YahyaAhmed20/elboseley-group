@@ -1,7 +1,7 @@
 """
 Django settings for zoksh project.
 """
-
+import dj_database_url
 from pathlib import Path
 import os
 import sys
@@ -18,22 +18,40 @@ else:
 # ============================================================
 # Security
 # ============================================================
-SECRET_KEY = 'django-insecure-_678#zj)u2%di2-j-hj7q=&k964i@f1&rlz=fb50nda4d%z)t)'
 
-DEBUG = True
-# DEBUG = False
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+
+if not SECRET_KEY:
+    if os.getenv("DJANGO_DEBUG", "True").lower() != "true":
+        raise RuntimeError(
+            "DJANGO_SECRET_KEY must be set when DEBUG is disabled."
+        )
+    SECRET_KEY = "dev-only-change-this-key"
+
+DEBUG = os.getenv("DJANGO_DEBUG", "True").lower() == "true"
 
 ALLOWED_HOSTS = [
-    "127.0.0.1",
-    "localhost",
-    "elbosely-group.up.railway.app",
+    host.strip()
+    for host in os.getenv(
+        "DJANGO_ALLOWED_HOSTS",
+        "127.0.0.1,localhost,elbosely-group.up.railway.app",
+    ).split(",")
+    if host.strip()
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://127.0.0.1:8000",
-    "http://localhost:8000",
-    "https://elbosely-group.up.railway.app",
+    origin.strip()
+    for origin in os.getenv(
+        "DJANGO_CSRF_TRUSTED_ORIGINS",
+        "http://127.0.0.1:8000,http://localhost:8000,https://elbosely-group.up.railway.app",
+    ).split(",")
+    if origin.strip()
 ]
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 
 # ============================================================
@@ -109,28 +127,26 @@ TEMPLATES = [
 WSGI_APPLICATION = 'project.wsgi.application'
 
 
-# ============================================================
-# Database — SQLite محلياً
-# ============================================================
-# DATABASES = {
-#      'default': {
-#          'ENGINE': 'django.db.backends.sqlite3',
-#          'NAME': BASE_DIR / 'db.sqlite3',
-#      }
-#  }
 
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'railway',
-        'USER': 'postgres',
-        'PASSWORD': 'nwWfksmJVUfKPAzqlzMGslPkNuUgKENv',
-        'HOST': 'hayabusa.proxy.rlwy.net',
-        'PORT': '21945',
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=True,
+        )
     }
-}
-
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db_local.sqlite3",
+        }
+    }
 
 
 
